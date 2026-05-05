@@ -1,0 +1,413 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>板块构造动力学演示系统 · Plate Tectonics Dynamics</title>
+    <!-- 样式表（esbuild 打包产物） -->
+    <link rel="stylesheet" href="./dist/main.bundle.css">
+</head>
+<body>
+
+<!-- 加载覆盖层 -->
+<div id="loading-overlay">
+    <div class="loading-globe">🌍</div>
+    <div class="loading-rings-wrap">
+        <div class="loading-ring-outer"></div>
+        <div class="loading-ring"></div>
+    </div>
+    <div class="loading-text">Initializing Convergent Section Study</div>
+    <div class="loading-progress"><div class="loading-progress-fill"></div></div>
+    <div class="loading-subtext">Rebuilding Scale · Terrain · Section Layers</div>
+    <div class="loading-steps" id="loadingSteps">CALIBRATING GEOLOGICAL PARAMETERS...</div>
+</div>
+
+<!-- ===== 欢迎页 ===== -->
+<div id="welcome-screen">
+    <!-- 角落装饰 -->
+    <div class="welcome-corner tl"></div>
+    <div class="welcome-corner tr"></div>
+    <div class="welcome-corner bl"></div>
+    <div class="welcome-corner br"></div>
+
+    <!-- 版本标识 -->
+    <div class="welcome-version">v3.0 · PLATE TECTONICS DYNAMICS SYSTEM</div>
+
+    <!-- 内容卡片 -->
+    <div class="welcome-content">
+        <div class="welcome-logo">🌏</div>
+        <div class="welcome-title">板块构造动力学演示系统</div>
+        <div class="welcome-subtitle">PLATE TECTONICS DYNAMICS VISUALIZATION</div>
+        <div class="welcome-desc">可视化教学平台 &nbsp;·&nbsp; 请选择进入方式</div>
+        <div class="welcome-btns">
+            <button class="welcome-btn" id="loadPdfBtn">📄 &nbsp;加载 PDF 课件</button>
+            <button class="welcome-btn orange-btn" id="enterModelBtn">🌏 &nbsp;进入模型展示</button>
+        </div>
+    </div>
+
+    <!-- 隐藏的 PDF 文件输入框 -->
+    <input type="file" id="pdfFileInput" accept=".pdf" style="display:none">
+</div>
+
+<!-- ===== PDF 展示页 ===== -->
+<div id="pdf-viewer">
+    <!-- 顶部标题栏 -->
+    <div class="pdf-header">
+        <div class="pdf-header-left">
+            <div class="pdf-header-icon">📄</div>
+            <div class="pdf-title-block">
+                <div class="pdf-title-main">课件展示系统</div>
+                <div class="pdf-title-sub">COURSEWARE PRESENTATION SYSTEM · PDF VIEWER</div>
+            </div>
+        </div>
+        <div class="pdf-header-right">
+            <div class="pdf-header-badge" id="pdfFileNameBadge">未加载文件</div>
+            <div class="pdf-header-badge" id="pdfPageCountBadge">— 页</div>
+            <button class="pdf-nav-btn model-btn" id="switchToModelBtn">🌏 &nbsp;进入模型展示</button>
+        </div>
+    </div>
+
+    <!-- 主体区域 -->
+    <div class="pdf-body">
+        <!-- 左侧缩略图侧边栏 -->
+        <aside class="pdf-sidebar">
+            <div class="pdf-sidebar-title">▶ 页面列表</div>
+            <div id="pdfThumbnails"></div>
+        </aside>
+
+        <!-- 中央 PDF 渲染区 -->
+        <main class="pdf-main">
+            <!-- 加载中状态 -->
+            <div class="pdf-canvas-loading" id="pdfCanvasLoading">
+                <div style="font-size:28px;animation:globeSpin 4s linear infinite">📄</div>
+                <div style="font-size:11px;color:var(--text3);letter-spacing:0.18em">RENDERING PAGE...</div>
+            </div>
+            <canvas id="pdfCanvas"></canvas>
+        </main>
+    </div>
+
+    <!-- 底部导航栏 -->
+    <div class="pdf-footer">
+        <button class="pdf-page-btn" id="prevPageBtn" disabled>← 上一页</button>
+        <span id="pageInfo">
+            <span class="current-page">1</span>
+            <span class="total-page"> / 1</span>
+        </span>
+        <button class="pdf-page-btn" id="nextPageBtn" disabled>下一页 →</button>
+    </div>
+</div>
+
+<!-- ===== 3D 模型展示页 ===== -->
+<div class="app" style="display:none">
+
+    <!-- ===== 顶部标题 ===== -->
+    <header class="header">
+        <div class="scan-line"></div>
+
+        <div class="header-left">
+            <div class="header-logo">🌏</div>
+            <div class="title-block">
+                <div class="title-main">板块俯冲构造剖面</div>
+                <div class="title-sub">CONVERGENT TECTONIC SECTION STUDY MODEL v3.0</div>
+            </div>
+        </div>
+
+        <div class="header-center">
+            <div class="header-badge active" id="boundaryTypeBadge">▶ 消亡边界 · CONVERGENT</div>
+            <div class="header-badge">WebGL 2.0</div>
+            <div class="header-badge">Three.js r161</div>
+        </div>
+
+        <div class="header-right">
+            <button id="switchToPdfBtn">📄 返回课件</button>
+            <div class="status-group">
+                <div class="status-dot"></div>
+                <div class="status-label">ONLINE</div>
+            </div>
+            <div class="sys-time"><span id="sysTime">—</span></div>
+        </div>
+    </header>
+
+    <!-- ===== 左侧数据面板 ===== -->
+    <aside class="side-panel left-panel">
+
+        <!-- 板块动力学参数 -->
+        <div class="panel-block orange-accent">
+            <div class="block-title orange">板块动力参数</div>
+            <div class="data-row">
+                <span class="data-key">板块收敛/扩张速度</span>
+                <span class="data-val" id="collisionVelocity">0.0 cm/yr</span>
+            </div>
+            <div class="data-row">
+                <span class="data-key">俯冲深度</span>
+                <span class="data-val" id="collisionDepth">0 km</span>
+            </div>
+            <div class="data-row">
+                <span class="data-key">地表隆起高度</span>
+                <span class="data-val" id="upliftHeight">0 m</span>
+            </div>
+            <div class="data-row">
+                <span class="data-key">海沟深度</span>
+                <span class="data-val cyan" id="trenchDepth">0 m</span>
+            </div>
+        </div>
+
+        <!-- 地球物理环境 -->
+        <div class="panel-block">
+            <div class="block-title">地球物理环境</div>
+            <div class="data-row">
+                <span class="data-key">地温梯度</span>
+                <span class="data-val yellow" id="temperature">1200 °C</span>
+            </div>
+            <div class="data-row">
+                <span class="data-key">地幔压力</span>
+                <span class="data-val" id="pressure">0.1 GPa</span>
+            </div>
+            <div class="data-row">
+                <span class="data-key">构造应力</span>
+                <span class="data-val" id="stress">5 MPa</span>
+            </div>
+            <div style="margin-top:8px">
+                <div style="font-size:9.5px;color:var(--text3);margin-bottom:5px;letter-spacing:0.08em">▸ 构造应力分布图</div>
+                <div class="mini-chart" id="stressChart">
+                    <div class="chart-bar" style="height:15%"></div>
+                    <div class="chart-bar" style="height:25%"></div>
+                    <div class="chart-bar" style="height:18%"></div>
+                    <div class="chart-bar" style="height:20%"></div>
+                    <div class="chart-bar" style="height:22%"></div>
+                    <div class="chart-bar" style="height:16%"></div>
+                    <div class="chart-bar" style="height:19%"></div>
+                    <div class="chart-bar" style="height:21%"></div>
+                    <div class="chart-bar" style="height:17%"></div>
+                    <div class="chart-bar" style="height:24%"></div>
+                    <div class="chart-bar" style="height:20%"></div>
+                    <div class="chart-bar" style="height:14%"></div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 地质时代 -->
+        <div class="panel-block">
+            <div class="block-title">地质年代</div>
+            <div style="text-align:center;padding:5px 0">
+                <div style="font-size:20px;color:var(--cyan);text-shadow:0 0 14px var(--glow-c);font-weight:bold;letter-spacing:0.05em" id="geologicalPeriod">太古代</div>
+                <div style="font-size:9.5px;color:var(--text3);margin-top:4px;letter-spacing:0.14em" id="timeEra">Archean Eon</div>
+            </div>
+            <div class="radar-wrap">
+                <div class="radar">
+                    <div class="radar-ring" style="width:90%;height:90%;border-color:var(--cyan)"></div>
+                    <div class="radar-ring" style="width:62%;height:62%;border-color:var(--cyan)"></div>
+                    <div class="radar-ring" style="width:38%;height:38%;border-color:var(--cyan)"></div>
+                    <div class="radar-inner">🌋</div>
+                </div>
+            </div>
+        </div>
+
+        <!-- 地质事件日志 -->
+        <div class="panel-block">
+            <div class="block-title">地质事件日志</div>
+            <div class="event-log" id="geoEventLog"></div>
+        </div>
+
+        <!-- 系统监控 -->
+        <div class="panel-block">
+            <div class="block-title">系统监控</div>
+            <div class="data-row">
+                <span class="data-key">帧率</span>
+                <span class="data-val green" id="fps">—</span>
+            </div>
+            <div class="data-row">
+                <span class="data-key">帧渲染时间</span>
+                <span class="data-val green" id="renderTime">— ms</span>
+            </div>
+            <div class="data-row">
+                <span class="data-key">活跃粒子数</span>
+                <span class="data-val cyan" id="particleCount">0</span>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ===== 中央画布 ===== -->
+    <main class="canvas-wrap">
+        <div id="canvasContainer"></div>
+        <!-- 四角装饰 -->
+        <div class="corner-deco tl"></div>
+        <div class="corner-deco tr"></div>
+        <div class="corner-deco bl"></div>
+        <div class="corner-deco br"></div>
+        <!-- 操作提示 -->
+        <div class="axis-hint">
+            🖱 拖拽旋转 &nbsp;·&nbsp; 滚轮缩放 &nbsp;·&nbsp; 聚焦剖面主体
+        </div>
+    </main>
+
+    <!-- ===== 右侧控制面板 ===== -->
+    <aside class="side-panel right-panel">
+
+        <!-- 时间轴 -->
+        <div class="panel-block">
+            <div class="block-title">地质时间轴</div>
+            <div class="slider-wrap">
+                <div class="slider-header">
+                    <span class="slider-label">时间进程 / Geological Time</span>
+                    <span class="slider-value-display cyan" id="timeDisplay">0</span>
+                </div>
+                <input type="range" id="timeSlider" min="0" max="100" value="0" step="1"
+                       style="--pct:0%">
+                <div class="slider-ticks">
+                    <span>0 Ma</span>
+                    <span>早期</span>
+                    <span>中期</span>
+                    <span>晚期</span>
+                    <span>100 Ma</span>
+                </div>
+                <div class="time-progress-wrap">
+                    <div class="time-progress-fill"></div>
+                </div>
+            </div>
+            <div style="font-size:9.5px;color:var(--text3);padding-top:6px;border-top:1px solid var(--border);display:flex;justify-content:space-between;align-items:center">
+                <span>当前时代：<span id="timeEraDisplay" style="color:var(--cyan)">太古代</span></span>
+                <span id="timeDisplaySub" style="color:var(--text3);font-size:9px">T = 0 Ma</span>
+            </div>
+        </div>
+
+        <!-- 自动播放 -->
+        <div class="panel-block">
+            <div class="block-title">时间控制</div>
+            <div class="btn-group">
+                <button class="btn" id="playBtn">
+                    <span class="btn-icon">▶</span>
+                    <span class="btn-text">自动播放</span>
+                    <span class="btn-badge">0.5×</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 强度轴 -->
+        <div class="panel-block">
+            <div class="block-title">板块动力强度</div>
+            <div class="slider-wrap">
+                <div class="slider-header">
+                    <span class="slider-label">强度系数 / Intensity</span>
+                    <span class="slider-value-display" id="intensityDisplay">1.0</span>
+                </div>
+                <input type="range" id="intensitySlider" min="0.1" max="3.0" value="1.0" step="0.1"
+                       style="--pct:31%">
+                <div class="slider-ticks">
+                    <span>微弱</span>
+                    <span>适中</span>
+                    <span>强烈</span>
+                    <span>极强</span>
+                </div>
+            </div>
+            <div class="legend">
+                <div class="legend-item">
+                    <div class="legend-dot" style="background:var(--cyan)"></div>弱 ≤ 1.0
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background:var(--orange)"></div>强 1.0~2.0
+                </div>
+                <div class="legend-item">
+                    <div class="legend-dot" style="background:#ff2244"></div>极强 &gt; 2.0
+                </div>
+            </div>
+        </div>
+
+        <!-- 边界类型 -->
+        <div class="panel-block">
+            <div class="block-title">板块边界类型</div>
+            <div class="btn-group">
+                <button class="btn active" id="convergentBtn">
+                    <span class="btn-icon">⛰</span>
+                    <span class="btn-text">消亡边界（俯冲）</span>
+                    <span class="btn-badge">碰撞</span>
+                </button>
+                <button class="btn" id="divergentBtn">
+                    <span class="btn-icon">🌊</span>
+                    <span class="btn-text">生长边界（扩张）</span>
+                    <span class="btn-badge">分离</span>
+                </button>
+            </div>
+            <div class="info-box" id="boundaryInfo">
+                <div class="info-item">⛰ 俯冲碰撞，形成山脉与海沟</div>
+                <div class="info-item">🌋 俯冲带产生岩浆，形成火山弧</div>
+                <div class="info-item">🏝 岛弧在大陆边缘生成</div>
+                <div class="info-item">⚡ 地震频繁，能量释放强烈</div>
+            </div>
+        </div>
+
+        <!-- 视角控制 -->
+        <div class="panel-block">
+            <div class="block-title">视角控制</div>
+            <div class="btn-group">
+                <button class="btn" id="resetViewBtn">
+                    <span class="btn-icon">🎯</span>
+                    <span class="btn-text">重置默认视角</span>
+                </button>
+                <button class="btn" id="toggleAutoRotate">
+                    <span class="btn-icon">🔄</span>
+                    <span class="btn-text">自动旋转</span>
+                    <span class="btn-badge" id="rotateStatus">OFF</span>
+                </button>
+            </div>
+        </div>
+
+        <!-- 地理地标 -->
+        <div class="panel-block">
+            <div class="block-title">关键地标</div>
+            <div style="font-size:9.5px;line-height:2.1;color:var(--text3)">
+                <div>🧭 印度板块 &nbsp;·&nbsp; 自左向右汇聚</div>
+                <div>🗻 亚欧板块 &nbsp;·&nbsp; 前缘形成高原山系</div>
+                <div>🌊 海沟带 &nbsp;·&nbsp; 板片开始向下俯冲</div>
+                <div>🌋 软流圈 &nbsp;·&nbsp; 地幔热量强烈上涌</div>
+                <div>💠 洋中脊 &nbsp;·&nbsp; 远洋海盆起伏骨架</div>
+            </div>
+        </div>
+
+    </aside>
+
+    <!-- ===== 底部状态栏 ===== -->
+    <footer class="footer">
+        <div class="footer-item">
+            <span class="footer-label">地质时期</span>
+            <span class="footer-value" id="geoFooterPeriod">太古代</span>
+        </div>
+        <div class="footer-item">
+            <span class="footer-label">板块运动</span>
+            <span class="footer-value" id="motionStatus">静止</span>
+        </div>
+        <div class="footer-item">
+            <span class="footer-label">边界模式</span>
+            <span class="footer-value orange" id="boundaryMode">消亡边界</span>
+        </div>
+
+        <!-- 脉冲线装饰 -->
+        <div class="footer-pulse">
+            <svg class="pulse-svg" viewBox="0 0 400 22" preserveAspectRatio="none">
+                <polyline id="pulsePolyline"
+                    points="0,11 40,11 50,4 60,18 70,4 80,18 90,11 140,11 150,5 160,17 170,5 180,17 190,11 240,11 250,3 260,19 270,3 280,19 290,11 400,11"
+                    fill="none" stroke="rgba(0,212,255,0.45)" stroke-width="1.5" stroke-linejoin="round"/>
+            </svg>
+        </div>
+
+        <div class="footer-item">
+            <span class="footer-label">渲染引擎</span>
+            <span class="footer-value">WebGL 2.0</span>
+        </div>
+        <div class="footer-item">
+            <span class="footer-label">时间参数</span>
+            <span class="footer-value" id="footerTime">T = 0 Ma</span>
+        </div>
+    </footer>
+
+</div><!-- .app -->
+
+<!-- PDF.js CDN（需在 bundle 之前加载，供 PdfViewer.js 使用） -->
+<script src="https://cdnjs.cloudflare.com/ajax/libs/pdf.js/3.11.174/pdf.min.js"></script>
+
+<!-- 打包后的 bundle（含 Three.js + app-init + PDF逻辑 + 全部纹理 Base64 内联） -->
+<script src="./dist/main.bundle.js"></script>
+
+</body>
+</html>

@@ -1,0 +1,205 @@
+/* ============================================================
+   PDF 展示页
+============================================================ */
+#pdf-viewer {
+    display: none;
+    position: fixed; inset: 0; z-index: 999;
+    background: var(--bg0);
+    flex-direction: column;
+    font-family: var(--font);
+}
+#pdf-viewer.visible { display: flex; }
+
+/* ── 顶部标题栏 ── */
+.pdf-header {
+    flex-shrink: 0;
+    height: var(--header-h);
+    background: linear-gradient(90deg, var(--bg2) 0%, #060f22 45%, #080c1c 55%, var(--bg2) 100%);
+    border-bottom: 1px solid var(--border2);
+    display: flex; align-items: center; justify-content: space-between;
+    padding: 0 24px;
+    position: relative;
+}
+.pdf-header::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 1px;
+    background: linear-gradient(90deg, transparent, var(--cyan) 20%, rgba(0,212,255,0.6) 50%, var(--cyan) 80%, transparent);
+    opacity: 0.7;
+}
+.pdf-header-left { display: flex; align-items: center; gap: 14px; }
+.pdf-header-icon { font-size: 24px; }
+.pdf-title-main {
+    font-size: 16px; font-weight: bold;
+    color: var(--cyan);
+    text-shadow: 0 0 14px var(--glow-c);
+    letter-spacing: 0.08em;
+}
+.pdf-title-sub {
+    font-size: 9px; color: var(--text3);
+    letter-spacing: 0.16em; text-transform: uppercase;
+    margin-top: 2px;
+}
+.pdf-header-right { display: flex; align-items: center; gap: 10px; }
+.pdf-header-badge {
+    padding: 4px 10px;
+    border: 1px solid var(--border2);
+    border-radius: 2px;
+    font-size: 10px; letter-spacing: 0.1em;
+    color: var(--text3);
+    background: rgba(0,212,255,0.03);
+    white-space: nowrap; overflow: hidden; text-overflow: ellipsis;
+    max-width: 180px;
+}
+
+/* ── 主体区域 ── */
+.pdf-body {
+    flex: 1;
+    display: flex;
+    overflow: hidden;
+    min-height: 0;
+}
+
+/* ── 左侧缩略图侧边栏 ── */
+.pdf-sidebar {
+    width: 168px; flex-shrink: 0;
+    background: var(--bg1);
+    border-right: 1px solid var(--border);
+    overflow-y: auto;
+    display: flex; flex-direction: column;
+    padding: 10px 8px;
+    gap: 0;
+}
+.pdf-sidebar::-webkit-scrollbar { width: 3px; }
+.pdf-sidebar::-webkit-scrollbar-track { background: var(--bg0); }
+.pdf-sidebar::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+.pdf-sidebar::-webkit-scrollbar-thumb:hover { background: var(--cyan2); }
+
+.pdf-sidebar-title {
+    font-size: 9px; letter-spacing: 0.18em; text-transform: uppercase;
+    color: var(--text3);
+    padding: 4px 4px 10px;
+    border-bottom: 1px solid var(--border);
+    margin-bottom: 8px;
+    flex-shrink: 0;
+}
+
+.pdf-thumb-item {
+    display: flex; flex-direction: column; align-items: center;
+    gap: 5px;
+    padding: 8px 4px;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.2s, border-color 0.2s;
+    border: 1px solid transparent;
+    margin-bottom: 4px;
+}
+.pdf-thumb-item:hover {
+    background: rgba(0,212,255,0.06);
+    border-color: rgba(0,212,255,0.2);
+}
+.pdf-thumb-item.active {
+    background: rgba(0,212,255,0.12);
+    border-color: var(--cyan);
+    box-shadow: 0 0 8px rgba(0,212,255,0.15);
+}
+.pdf-thumb-item canvas {
+    width: 100% !important;
+    height: auto !important;
+    border-radius: 2px;
+    background: var(--bg3);
+    border: 1px solid var(--border);
+    display: block;
+}
+.pdf-thumb-label {
+    font-size: 9px; color: var(--text3);
+    letter-spacing: 0.1em;
+}
+.pdf-thumb-item.active .pdf-thumb-label { color: var(--cyan); }
+
+/* ── 中央 PDF 渲染区 ── */
+.pdf-main {
+    flex: 1;
+    display: flex;
+    align-items: center; justify-content: center;
+    overflow: auto;
+    background: var(--bg0);
+    position: relative;
+    padding: 20px;
+}
+.pdf-main::-webkit-scrollbar { width: 5px; height: 5px; }
+.pdf-main::-webkit-scrollbar-track { background: var(--bg1); }
+.pdf-main::-webkit-scrollbar-thumb { background: var(--border2); border-radius: 2px; }
+
+#pdfCanvas {
+    display: block;
+    box-shadow: 0 0 40px rgba(0,0,0,0.8), 0 0 1px rgba(0,212,255,0.15);
+    border-radius: 2px;
+    max-width: 100%;
+    max-height: 100%;
+    /* 覆盖全局 canvas 样式 */
+    width: auto !important;
+    height: auto !important;
+}
+
+.pdf-canvas-loading {
+    position: absolute; inset: 0;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center;
+    gap: 12px;
+    background: rgba(1,8,16,0.7);
+    z-index: 2;
+}
+.pdf-canvas-loading.hidden { display: none; }
+
+/* ── 底部翻页导航 ── */
+.pdf-footer {
+    flex-shrink: 0;
+    height: 52px;
+    background: var(--bg2);
+    border-top: 1px solid var(--border);
+    display: flex; align-items: center; justify-content: center;
+    gap: 20px;
+}
+
+.pdf-page-btn {
+    padding: 7px 20px;
+    background: rgba(0,212,255,0.06);
+    border: 1px solid var(--border2);
+    border-radius: 3px;
+    color: var(--text2);
+    font-family: var(--font);
+    font-size: 10.5px; letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+}
+.pdf-page-btn:hover:not(:disabled) {
+    border-color: var(--cyan); color: var(--cyan);
+    background: rgba(0,212,255,0.12);
+    box-shadow: 0 0 10px rgba(0,212,255,0.2);
+}
+.pdf-page-btn:disabled { opacity: 0.35; cursor: not-allowed; }
+
+#pageInfo {
+    font-size: 13px; letter-spacing: 0.06em;
+    min-width: 80px; text-align: center;
+}
+.current-page { color: var(--cyan); font-weight: bold; text-shadow: 0 0 8px var(--glow-c); }
+.total-page { color: var(--text3); }
+
+/* ── 进入模型按钮（pdf header 内） ── */
+.pdf-nav-btn.model-btn {
+    padding: 6px 14px;
+    background: rgba(255,107,34,0.08);
+    border: 1px solid var(--orange);
+    border-radius: 3px;
+    color: var(--orange);
+    font-family: var(--font);
+    font-size: 10px; letter-spacing: 0.08em;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    white-space: nowrap;
+}
+.pdf-nav-btn.model-btn:hover {
+    background: rgba(255,107,34,0.18);
+    box-shadow: 0 0 14px rgba(255,107,34,0.3);
+}

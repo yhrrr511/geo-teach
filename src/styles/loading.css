@@ -1,0 +1,77 @@
+/* ============================================================
+   加载覆盖层
+============================================================ */
+#loading-overlay {
+    position: fixed; inset: 0; z-index: 9999;
+    background: var(--bg0);
+    display: flex; flex-direction: column; align-items: center; justify-content: center;
+    gap: 18px;
+    transition: opacity 1.0s ease;
+}
+#loading-overlay.hidden {
+    opacity: 0; pointer-events: none;
+    visibility: hidden;
+    transition: opacity 1.0s ease, visibility 0s linear 1.0s;
+}
+
+.loading-globe { font-size: 36px; animation: globeSpin 4s linear infinite; }
+@keyframes globeSpin {
+    0%, 100% { transform: scale(1) rotate(-5deg); }
+    25% { transform: scale(1.1) rotate(0deg); }
+    50% { transform: scale(1) rotate(5deg); }
+    75% { transform: scale(1.1) rotate(0deg); }
+}
+
+.loading-rings-wrap {
+    position: relative;
+    display: flex; align-items: center; justify-content: center;
+    width: 80px; height: 80px;
+}
+.loading-ring {
+    width: 64px; height: 64px; border-radius: 50%;
+    border: 2px solid var(--border2);
+    border-top-color: var(--cyan);
+    border-right-color: rgba(0,212,255,0.4);
+    animation: spin 0.85s linear infinite;
+    box-shadow: 0 0 20px rgba(0,212,255,0.2);
+}
+.loading-ring-outer {
+    width: 80px; height: 80px; border-radius: 50%;
+    border: 1px solid rgba(0,212,255,0.15);
+    border-bottom-color: var(--orange);
+    animation: spinReverse 2.5s linear infinite;
+    position: absolute;
+}
+@keyframes spin { to { transform: rotate(360deg); } }
+@keyframes spinReverse { to { transform: rotate(-360deg); } }
+
+.loading-text {
+    font-size: 11.5px; color: var(--text3);
+    letter-spacing: 0.22em; text-transform: uppercase;
+    text-align: center;
+}
+.loading-subtext {
+    font-size: 9px; color: var(--text3);
+    letter-spacing: 0.15em; opacity: 0.6;
+}
+.loading-progress {
+    width: 220px; height: 2px; background: var(--border2);
+    border-radius: 1px; overflow: hidden;
+    box-shadow: 0 0 6px rgba(0,212,255,0.1);
+}
+.loading-progress-fill {
+    height: 100%; background: linear-gradient(90deg, var(--cyan2), var(--cyan));
+    box-shadow: 0 0 10px var(--cyan);
+    animation: loadFill 2.2s cubic-bezier(0.4, 0, 0.2, 1) forwards;
+}
+@keyframes loadFill { from { width: 0; } to { width: 100%; } }
+
+.loading-steps {
+    font-size: 9px; color: var(--text3);
+    letter-spacing: 0.1em;
+    animation: stepFade 2s ease-in-out infinite;
+}
+@keyframes stepFade {
+    0%,100% { opacity: 0.4; }
+    50%      { opacity: 0.9; }
+}

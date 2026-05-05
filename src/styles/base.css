@@ -1,0 +1,48 @@
+/* ============================================================
+   CSS 变量 & 重置
+============================================================ */
+:root {
+    --bg0: #010810;
+    --bg1: #050d1a;
+    --bg2: #080f1e;
+    --bg3: #0c1428;
+    --cyan:    #00d4ff;
+    --cyan2:   #00a8cc;
+    --orange:  #ff6b22;
+    --orange2: #ff3300;
+    --green:   #00ff88;
+    --green2:  #00cc66;
+    --purple:  #9b59b6;
+    --yellow:  #ffcc00;
+    --text1: #e8f4ff;
+    --text2: #8aaabb;
+    --text3: #4a6677;
+    --border: #0d2234;
+    --border2: #142a3e;
+    --glow-c: rgba(0,212,255,0.4);
+    --glow-o: rgba(255,107,34,0.4);
+    --glow-g: rgba(0,255,136,0.35);
+    --font: 'Courier New', 'Consolas', 'SF Mono', monospace;
+    --font2: 'Arial', 'Microsoft YaHei', sans-serif;
+    --panel-w: 275px;
+    --right-w: 310px;
+    --header-h: 74px;
+    --footer-h: 52px;
+}
+
+*, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+html, body { width:100%; height:100%; overflow:hidden; background: var(--bg0); }
+body { font-family: var(--font); color: var(--text1); }
+
+/* 响应式断点 */
+@media (max-width: 1450px) {
+    :root { --panel-w: 245px; --right-w: 275px; }
+}
+@media (max-width: 1200px) {
+    :root { --panel-w: 215px; --right-w: 250px; }
+}
+@media (max-width: 1000px) {
+    .app { grid-template-columns: 1fr; }
+    .left-panel, .right-panel { display: none; }
+    .canvas-wrap { grid-column: 1; }
+}

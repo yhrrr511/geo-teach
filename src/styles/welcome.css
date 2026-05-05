@@ -1,0 +1,114 @@
+/* ============================================================
+   欢迎页
+============================================================ */
+#welcome-screen {
+    display: none;
+    position: fixed; inset: 0; z-index: 1000;
+    background: var(--bg0);
+    align-items: center; justify-content: center;
+    flex-direction: column;
+    font-family: var(--font);
+    background-image:
+        linear-gradient(rgba(0,212,255,0.03) 1px, transparent 1px),
+        linear-gradient(90deg, rgba(0,212,255,0.03) 1px, transparent 1px);
+    background-size: 48px 48px;
+}
+#welcome-screen.visible { display: flex; }
+
+.welcome-version {
+    position: absolute; top: 18px; right: 22px;
+    font-size: 9px; color: var(--text3);
+    letter-spacing: 0.18em; text-transform: uppercase;
+}
+
+.welcome-content {
+    display: flex; flex-direction: column; align-items: center; gap: 18px;
+    padding: 48px 64px;
+    background: rgba(6,16,36,0.8);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    position: relative;
+    box-shadow: 0 0 60px rgba(0,212,255,0.08), 0 0 120px rgba(0,0,0,0.6);
+}
+.welcome-content::before {
+    content: '';
+    position: absolute; top: 0; left: 0; right: 0; height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    border-radius: 2px 2px 0 0;
+}
+
+.welcome-logo { font-size: 52px; animation: logoPulse 3s ease-in-out infinite; }
+
+.welcome-title {
+    font-size: 24px; font-weight: bold;
+    color: var(--cyan);
+    text-shadow: 0 0 20px var(--glow-c);
+    letter-spacing: 0.06em;
+    text-align: center;
+}
+.welcome-subtitle {
+    font-size: 10px; color: var(--text3);
+    letter-spacing: 0.22em; text-transform: uppercase;
+}
+.welcome-desc {
+    font-size: 12px; color: var(--text2);
+    letter-spacing: 0.08em; margin-top: 4px;
+}
+.welcome-btns {
+    display: flex; gap: 16px; margin-top: 12px;
+    flex-wrap: wrap; justify-content: center;
+}
+
+.welcome-btn {
+    padding: 12px 32px;
+    background: rgba(0,212,255,0.08);
+    border: 1px solid var(--cyan);
+    border-radius: 3px;
+    color: var(--cyan);
+    font-family: var(--font);
+    font-size: 12px; letter-spacing: 0.1em;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    position: relative; overflow: hidden;
+    text-transform: uppercase;
+    box-shadow: 0 0 16px rgba(0,212,255,0.1);
+}
+.welcome-btn::before {
+    content: '';
+    position: absolute; inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(0,212,255,0.06), transparent);
+    transform: translateX(-100%);
+    transition: transform 0.4s ease;
+}
+.welcome-btn:hover::before { transform: translateX(100%); }
+.welcome-btn:hover {
+    background: rgba(0,212,255,0.16);
+    box-shadow: 0 0 24px rgba(0,212,255,0.25);
+    transform: translateY(-1px);
+}
+.welcome-btn.orange-btn {
+    background: rgba(255,107,34,0.08);
+    border-color: var(--orange);
+    color: var(--orange);
+    box-shadow: 0 0 16px rgba(255,107,34,0.1);
+}
+.welcome-btn.orange-btn::before {
+    background: linear-gradient(90deg, transparent, rgba(255,107,34,0.06), transparent);
+}
+.welcome-btn.orange-btn:hover {
+    background: rgba(255,107,34,0.16);
+    box-shadow: 0 0 24px rgba(255,107,34,0.25);
+}
+
+/* 四角装饰 */
+.welcome-corner {
+    position: fixed;
+    width: 28px; height: 28px;
+    border-color: var(--cyan);
+    border-style: solid;
+    opacity: 0.3;
+}
+.welcome-corner.tl { top: 20px; left: 20px; border-width: 2px 0 0 2px; }
+.welcome-corner.tr { top: 20px; right: 20px; border-width: 2px 2px 0 0; }
+.welcome-corner.bl { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; }
+.welcome-corner.br { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; }
