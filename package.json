@@ -2,5 +2,13 @@
   "name": "geo-teach",
   "version": "1.0.0",
   "private": true,
-  "sideEffects": true
+  "sideEffects": true,
+  "scripts": {
+    "build:js": "esbuild build-entry.js --bundle --format=iife --global-name=GeoTeachApp --outfile=dist/main.bundle.js --alias:three=./vendor/three/build/three.module.js --alias:three/examples/jsm/controls/OrbitControls.js=./vendor/three/examples/jsm/controls/OrbitControls.js --alias:three/examples/jsm/renderers/CSS2DRenderer.js=./vendor/three/examples/jsm/renderers/CSS2DRenderer.js --alias:three/examples/jsm/postprocessing/EffectComposer.js=./vendor/three/examples/jsm/postprocessing/EffectComposer.js --alias:three/examples/jsm/postprocessing/RenderPass.js=./vendor/three/examples/jsm/postprocessing/RenderPass.js --alias:three/examples/jsm/postprocessing/UnrealBloomPass.js=./vendor/three/examples/jsm/postprocessing/UnrealBloomPass.js --alias:three/examples/jsm/objects/Water.js=./vendor/three/examples/jsm/objects/Water.js --alias:three/examples/jsm/shaders/CopyShader.js=./vendor/three/examples/jsm/shaders/CopyShader.js --alias:three/examples/jsm/shaders/LuminosityHighPassShader.js=./vendor/three/examples/jsm/shaders/LuminosityHighPassShader.js",
+    "build:textures": "node scripts/inline-textures.mjs",
+    "build": "npm run build:js && npm run build:textures"
+  },
+  "devDependencies": {
+    "esbuild": "^0.25.0"
+  }
 }
