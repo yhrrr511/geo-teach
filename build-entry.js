@@ -6,11 +6,7 @@ import './src/styles/layout.css';
 import './src/styles/components.css';
 import './src/styles/loading.css';
 import './src/styles/welcome.css';
-import './src/styles/pdf-viewer.css';
 
-// ── 应用初始化（视图切换 + 加载动画 + PDF 功能）────────────
+// ── 应用初始化（模型选择 + 页面切换）────────────────────────
 import { initApp } from './src/app-init.js';
 initApp();
-
-// ── Three.js 3D 模型主逻辑 ───────────────────────────────────
-import './src/main.js';

@@ -112,3 +112,94 @@
 .welcome-corner.tr { top: 20px; right: 20px; border-width: 2px 2px 0 0; }
 .welcome-corner.bl { bottom: 20px; left: 20px; border-width: 0 0 2px 2px; }
 .welcome-corner.br { bottom: 20px; right: 20px; border-width: 0 2px 2px 0; }
+
+.model-cards {
+    display: flex;
+    gap: 24px;
+    margin-top: 20px;
+    flex-wrap: wrap;
+    justify-content: center;
+}
+
+.model-card {
+    width: 220px;
+    padding: 24px 20px;
+    background: rgba(6,16,36,0.9);
+    border: 1px solid var(--border2);
+    border-radius: 6px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    text-align: center;
+    position: relative;
+    overflow: hidden;
+}
+
+.model-card::before {
+    content: '';
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    height: 2px;
+    background: linear-gradient(90deg, transparent, var(--cyan), transparent);
+    opacity: 0;
+    transition: opacity 0.3s ease;
+}
+
+.model-card:hover {
+    border-color: var(--cyan);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 32px rgba(0,212,255,0.15);
+}
+
+.model-card:hover::before {
+    opacity: 1;
+}
+
+.model-card-icon {
+    font-size: 48px;
+    margin-bottom: 12px;
+    animation: iconFloat 3s ease-in-out infinite;
+}
+
+@keyframes iconFloat {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+}
+
+.model-card-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: var(--cyan);
+    margin-bottom: 4px;
+    letter-spacing: 0.05em;
+}
+
+.model-card-desc {
+    font-size: 10px;
+    color: var(--text3);
+    letter-spacing: 0.15em;
+    text-transform: uppercase;
+    margin-bottom: 12px;
+}
+
+.model-card-info {
+    font-size: 11px;
+    color: var(--text2);
+    line-height: 1.6;
+    padding-top: 12px;
+    border-top: 1px solid var(--border);
+}
+
+.model-card:nth-child(2) .model-card-title {
+    color: var(--orange);
+}
+
+.model-card:nth-child(2)::before {
+    background: linear-gradient(90deg, transparent, var(--orange), transparent);
+}
+
+.model-card:nth-child(2):hover {
+    border-color: var(--orange);
+    box-shadow: 0 8px 32px rgba(255,107,34,0.15);
+}
