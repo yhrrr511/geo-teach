@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>地理教学演示系统 · Geography Teaching System</title>
+    <title>板块构造运动 · Plate Tectonics</title>
     <link rel="stylesheet" href="./dist/main.bundle.css">
 </head>
 <body>
@@ -14,43 +14,13 @@
         <div class="loading-ring-outer"></div>
         <div class="loading-ring"></div>
     </div>
-    <div class="loading-text">Initializing Geography Teaching System</div>
+    <div class="loading-text">Initializing Plate Tectonics Model</div>
     <div class="loading-progress"><div class="loading-progress-fill"></div></div>
     <div class="loading-subtext">Loading Models · Textures · Shaders</div>
     <div class="loading-steps" id="loadingSteps">CALIBRATING PARAMETERS...</div>
 </div>
 
-<div id="welcome-screen" class="visible">
-    <div class="welcome-corner tl"></div>
-    <div class="welcome-corner tr"></div>
-    <div class="welcome-corner bl"></div>
-    <div class="welcome-corner br"></div>
-    <div class="welcome-version">v4.0 · GEOGRAPHY TEACHING SYSTEM</div>
-
-    <div class="welcome-content">
-        <div class="welcome-logo">🌏</div>
-        <div class="welcome-title">地理教学演示系统</div>
-        <div class="welcome-subtitle">GEOGRAPHY TEACHING VISUALIZATION SYSTEM</div>
-        <div class="welcome-desc">可视化教学平台 &nbsp;·&nbsp; 请选择演示模型</div>
-        
-        <div class="model-cards">
-            <div class="model-card" data-model="tectonic">
-                <div class="model-card-icon">🌋</div>
-                <div class="model-card-title">板块构造运动</div>
-                <div class="model-card-desc">Plate Tectonics</div>
-                <div class="model-card-info">演示板块俯冲、碰撞、扩张等地质过程</div>
-            </div>
-            <div class="model-card" data-model="wind">
-                <div class="model-card-icon">🏜</div>
-                <div class="model-card-title">风力搬运作用</div>
-                <div class="model-card-desc">Wind Transportation</div>
-                <div class="model-card-info">演示风力对沙丘的侵蚀、搬运与沉积过程</div>
-            </div>
-        </div>
-    </div>
-</div>
-
-<div id="model-container" style="display:none"></div>
+<div id="model-container" style="display:none;width:100%;height:100%"></div>
 
 <script src="./dist/main.bundle.js"></script>
 </body>

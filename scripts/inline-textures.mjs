@@ -1,7 +1,6 @@
 /**
  * inline-textures.mjs
- * 把纹理文件 Base64 编码后，生成一个 JS 模块 src/textureData.js
- * 再替换 bundle 里的纹理路径为 data URL
+ * 把纹理文件 Base64 编码后，内联替换 bundle 里的纹理路径为 data URL
  */
 
 import { readFileSync, writeFileSync } from 'fs';
@@ -11,6 +10,7 @@ import { fileURLToPath } from 'url';
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const root = join(__dirname, '..');
 
+// 板块构造模型使用的纹理
 const TEXTURES = {
     './assets/textures/ambientcg/Ice002_1K-JPG_NormalGL.jpg': 'image/jpeg',
     './assets/textures/ambientcg/Ice002_1K-JPG_Color.jpg':    'image/jpeg',
@@ -50,7 +50,7 @@ for (const [relPath, mime] of Object.entries(TEXTURES)) {
         console.log(`✅ 内联: ${relPath} (${Math.round(data.length / 1024)}KB → ${Math.round(dataUrl.length / 1024)}KB base64)`);
         replaced++;
     } else {
-        console.warn(`⚠️  未找到路径: ${relPath}`);
+        console.log(`ℹ️  未引用（跳过）: ${relPath}`);
     }
 }
 

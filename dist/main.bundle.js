@@ -8659,49 +8659,9 @@ var GeoTeachApp = (() => {
   });
 
   // vendor/three/src/scenes/Fog.js
-  var Fog;
   var init_Fog = __esm({
     "vendor/three/src/scenes/Fog.js"() {
       init_Color();
-      Fog = class _Fog {
-        /**
-         * Constructs a new fog.
-         *
-         * @param {number|Color} color - The fog's color.
-         * @param {number} [near=1] - The minimum distance to start applying fog.
-         * @param {number} [far=1000] - The maximum distance at which fog stops being calculated and applied.
-         */
-        constructor(color, near = 1, far = 1e3) {
-          this.isFog = true;
-          this.name = "";
-          this.color = new Color(color);
-          this.near = near;
-          this.far = far;
-        }
-        /**
-         * Returns a new fog with copied values from this instance.
-         *
-         * @return {Fog} A clone of this instance.
-         */
-        clone() {
-          return new _Fog(this.color, this.near, this.far);
-        }
-        /**
-         * Serializes the fog into JSON.
-         *
-         * @param {?(Object|string)} meta - An optional value holding meta information about the serialization.
-         * @return {Object} A JSON object representing the serialized fog
-         */
-        toJSON() {
-          return {
-            type: "Fog",
-            name: this.name,
-            color: this.color.getHex(),
-            near: this.near,
-            far: this.far
-          };
-        }
-      };
     }
   });
 
@@ -13234,69 +13194,14 @@ var GeoTeachApp = (() => {
   });
 
   // vendor/three/src/materials/PointsMaterial.js
-  var PointsMaterial;
   var init_PointsMaterial = __esm({
     "vendor/three/src/materials/PointsMaterial.js"() {
       init_Material();
       init_Color();
-      PointsMaterial = class extends Material {
-        /**
-         * Constructs a new points material.
-         *
-         * @param {Object} [parameters] - An object with one or more properties
-         * defining the material's appearance. Any property of the material
-         * (including any property from inherited materials) can be passed
-         * in here. Color values can be passed any type of value accepted
-         * by {@link Color#set}.
-         */
-        constructor(parameters) {
-          super();
-          this.isPointsMaterial = true;
-          this.type = "PointsMaterial";
-          this.color = new Color(16777215);
-          this.map = null;
-          this.alphaMap = null;
-          this.size = 1;
-          this.sizeAttenuation = true;
-          this.fog = true;
-          this.setValues(parameters);
-        }
-        copy(source) {
-          super.copy(source);
-          this.color.copy(source.color);
-          this.map = source.map;
-          this.alphaMap = source.alphaMap;
-          this.size = source.size;
-          this.sizeAttenuation = source.sizeAttenuation;
-          this.fog = source.fog;
-          return this;
-        }
-      };
     }
   });
 
   // vendor/three/src/objects/Points.js
-  function testPoint(point, index, localThresholdSq, matrixWorld, raycaster, intersects2, object) {
-    const rayPointDistanceSq = _ray3.distanceSqToPoint(point);
-    if (rayPointDistanceSq < localThresholdSq) {
-      const intersectPoint = new Vector3();
-      _ray3.closestPointToPoint(point, intersectPoint);
-      intersectPoint.applyMatrix4(matrixWorld);
-      const distance = raycaster.ray.origin.distanceTo(intersectPoint);
-      if (distance < raycaster.near || distance > raycaster.far) return;
-      intersects2.push({
-        distance,
-        distanceToRay: Math.sqrt(rayPointDistanceSq),
-        point: intersectPoint,
-        index,
-        face: null,
-        faceIndex: null,
-        barycoord: null,
-        object
-      });
-    }
-  }
-  var _inverseMatrix3, _ray3, _sphere4, _position2, Points;
   var init_Points = __esm({
     "vendor/three/src/objects/Points.js"() {
       init_Sphere();
@@ -13306,95 +13211,6 @@ var GeoTeachApp = (() => {
       init_Vector3();
       init_PointsMaterial();
       init_BufferGeometry();
-      _inverseMatrix3 = /* @__PURE__ */ new Matrix4();
-      _ray3 = /* @__PURE__ */ new Ray();
-      _sphere4 = /* @__PURE__ */ new Sphere();
-      _position2 = /* @__PURE__ */ new Vector3();
-      Points = class extends Object3D {
-        /**
-         * Constructs a new point cloud.
-         *
-         * @param {BufferGeometry} [geometry] - The points geometry.
-         * @param {Material|Array<Material>} [material] - The points material.
-         */
-        constructor(geometry = new BufferGeometry(), material = new PointsMaterial()) {
-          super();
-          this.isPoints = true;
-          this.type = "Points";
-          this.geometry = geometry;
-          this.material = material;
-          this.morphTargetDictionary = void 0;
-          this.morphTargetInfluences = void 0;
-          this.updateMorphTargets();
-        }
-        copy(source, recursive) {
-          super.copy(source, recursive);
-          this.material = Array.isArray(source.material) ? source.material.slice() : source.material;
-          this.geometry = source.geometry;
-          return this;
-        }
-        /**
-         * Computes intersection points between a casted ray and this point cloud.
-         *
-         * @param {Raycaster} raycaster - The raycaster.
-         * @param {Array<Object>} intersects - The target array that holds the intersection points.
-         */
-        raycast(raycaster, intersects2) {
-          const geometry = this.geometry;
-          const matrixWorld = this.matrixWorld;
-          const threshold = raycaster.params.Points.threshold;
-          const drawRange = geometry.drawRange;
-          if (geometry.boundingSphere === null) geometry.computeBoundingSphere();
-          _sphere4.copy(geometry.boundingSphere);
-          _sphere4.applyMatrix4(matrixWorld);
-          _sphere4.radius += threshold;
-          if (raycaster.ray.intersectsSphere(_sphere4) === false) return;
-          _inverseMatrix3.copy(matrixWorld).invert();
-          _ray3.copy(raycaster.ray).applyMatrix4(_inverseMatrix3);
-          const localThreshold = threshold / ((this.scale.x + this.scale.y + this.scale.z) / 3);
-          const localThresholdSq = localThreshold * localThreshold;
-          const index = geometry.index;
-          const attributes = geometry.attributes;
-          const positionAttribute = attributes.position;
-          if (index !== null) {
-            const start = Math.max(0, drawRange.start);
-            const end = Math.min(index.count, drawRange.start + drawRange.count);
-            for (let i = start, il = end; i < il; i++) {
-              const a = index.getX(i);
-              _position2.fromBufferAttribute(positionAttribute, a);
-              testPoint(_position2, a, localThresholdSq, matrixWorld, raycaster, intersects2, this);
-            }
-          } else {
-            const start = Math.max(0, drawRange.start);
-            const end = Math.min(positionAttribute.count, drawRange.start + drawRange.count);
-            for (let i = start, l = end; i < l; i++) {
-              _position2.fromBufferAttribute(positionAttribute, i);
-              testPoint(_position2, i, localThresholdSq, matrixWorld, raycaster, intersects2, this);
-            }
-          }
-        }
-        /**
-         * Sets the values of {@link Points#morphTargetDictionary} and {@link Points#morphTargetInfluences}
-         * to make sure existing morph targets can influence this 3D object.
-         */
-        updateMorphTargets() {
-          const geometry = this.geometry;
-          const morphAttributes = geometry.morphAttributes;
-          const keys = Object.keys(morphAttributes);
-          if (keys.length > 0) {
-            const morphAttribute = morphAttributes[keys[0]];
-            if (morphAttribute !== void 0) {
-              this.morphTargetInfluences = [];
-              this.morphTargetDictionary = {};
-              for (let m = 0, ml = morphAttribute.length; m < ml; m++) {
-                const name = morphAttribute[m].name || String(m);
-                this.morphTargetInfluences.push(0);
-                this.morphTargetDictionary[name] = m;
-              }
-            }
-          }
-        }
-      };
     }
   });
 
@@ -16110,21 +15926,6 @@ var GeoTeachApp = (() => {
   });
 
   // vendor/three/src/geometries/ExtrudeGeometry.js
-  function toJSON(shapes, options, data) {
-    data.shapes = [];
-    if (Array.isArray(shapes)) {
-      for (let i = 0, l = shapes.length; i < l; i++) {
-        const shape = shapes[i];
-        data.shapes.push(shape.uuid);
-      }
-    } else {
-      data.shapes.push(shapes.uuid);
-    }
-    data.options = Object.assign({}, options);
-    if (options.extrudePath !== void 0) data.options.extrudePath = options.extrudePath.toJSON();
-    return data;
-  }
-  var ExtrudeGeometry, WorldUVGenerator;
   var init_ExtrudeGeometry = __esm({
     "vendor/three/src/geometries/ExtrudeGeometry.js"() {
       init_BufferGeometry();
@@ -16135,431 +15936,6 @@ var GeoTeachApp = (() => {
       init_Shape();
       init_ShapeUtils();
       init_utils();
-      ExtrudeGeometry = class _ExtrudeGeometry extends BufferGeometry {
-        /**
-         * Constructs a new extrude geometry.
-         *
-         * @param {Shape|Array<Shape>} [shapes] - A shape or an array of shapes.
-         * @param {ExtrudeGeometry~Options} [options] - The extrude settings.
-         */
-        constructor(shapes = new Shape([new Vector2(0.5, 0.5), new Vector2(-0.5, 0.5), new Vector2(-0.5, -0.5), new Vector2(0.5, -0.5)]), options = {}) {
-          super();
-          this.type = "ExtrudeGeometry";
-          this.parameters = {
-            shapes,
-            options
-          };
-          shapes = Array.isArray(shapes) ? shapes : [shapes];
-          const scope = this;
-          const verticesArray = [];
-          const uvArray = [];
-          for (let i = 0, l = shapes.length; i < l; i++) {
-            const shape = shapes[i];
-            addShape(shape);
-          }
-          this.setAttribute("position", new Float32BufferAttribute(verticesArray, 3));
-          this.setAttribute("uv", new Float32BufferAttribute(uvArray, 2));
-          this.computeVertexNormals();
-          function addShape(shape) {
-            const placeholder = [];
-            const curveSegments = options.curveSegments !== void 0 ? options.curveSegments : 12;
-            const steps = options.steps !== void 0 ? options.steps : 1;
-            const depth = options.depth !== void 0 ? options.depth : 1;
-            let bevelEnabled = options.bevelEnabled !== void 0 ? options.bevelEnabled : true;
-            let bevelThickness = options.bevelThickness !== void 0 ? options.bevelThickness : 0.2;
-            let bevelSize = options.bevelSize !== void 0 ? options.bevelSize : bevelThickness - 0.1;
-            let bevelOffset = options.bevelOffset !== void 0 ? options.bevelOffset : 0;
-            let bevelSegments = options.bevelSegments !== void 0 ? options.bevelSegments : 3;
-            const extrudePath = options.extrudePath;
-            const uvgen = options.UVGenerator !== void 0 ? options.UVGenerator : WorldUVGenerator;
-            let extrudePts, extrudeByPath = false;
-            let splineTube, binormal, normal, position2;
-            if (extrudePath) {
-              extrudePts = extrudePath.getSpacedPoints(steps);
-              extrudeByPath = true;
-              bevelEnabled = false;
-              const isClosed = extrudePath.isCatmullRomCurve3 ? extrudePath.closed : false;
-              splineTube = extrudePath.computeFrenetFrames(steps, isClosed);
-              binormal = new Vector3();
-              normal = new Vector3();
-              position2 = new Vector3();
-            }
-            if (!bevelEnabled) {
-              bevelSegments = 0;
-              bevelThickness = 0;
-              bevelSize = 0;
-              bevelOffset = 0;
-            }
-            const shapePoints = shape.extractPoints(curveSegments);
-            let vertices = shapePoints.shape;
-            const holes = shapePoints.holes;
-            const reverse = !ShapeUtils.isClockWise(vertices);
-            if (reverse) {
-              vertices = vertices.reverse();
-              for (let h = 0, hl = holes.length; h < hl; h++) {
-                const ahole = holes[h];
-                if (ShapeUtils.isClockWise(ahole)) {
-                  holes[h] = ahole.reverse();
-                }
-              }
-            }
-            function mergeOverlappingPoints(points) {
-              const THRESHOLD = 1e-10;
-              const THRESHOLD_SQ = THRESHOLD * THRESHOLD;
-              let prevPos = points[0];
-              for (let i = 1; i <= points.length; i++) {
-                const currentIndex = i % points.length;
-                const currentPos = points[currentIndex];
-                const dx = currentPos.x - prevPos.x;
-                const dy = currentPos.y - prevPos.y;
-                const distSq = dx * dx + dy * dy;
-                const scalingFactorSqrt = Math.max(
-                  Math.abs(currentPos.x),
-                  Math.abs(currentPos.y),
-                  Math.abs(prevPos.x),
-                  Math.abs(prevPos.y)
-                );
-                const thresholdSqScaled = THRESHOLD_SQ * scalingFactorSqrt * scalingFactorSqrt;
-                if (distSq <= thresholdSqScaled) {
-                  points.splice(currentIndex, 1);
-                  i--;
-                  continue;
-                }
-                prevPos = currentPos;
-              }
-            }
-            mergeOverlappingPoints(vertices);
-            holes.forEach(mergeOverlappingPoints);
-            const numHoles = holes.length;
-            const contour = vertices;
-            for (let h = 0; h < numHoles; h++) {
-              const ahole = holes[h];
-              vertices = vertices.concat(ahole);
-            }
-            function scalePt2(pt, vec, size) {
-              if (!vec) error("ExtrudeGeometry: vec does not exist");
-              return pt.clone().addScaledVector(vec, size);
-            }
-            const vlen = vertices.length;
-            function getBevelVec(inPt, inPrev, inNext) {
-              let v_trans_x, v_trans_y, shrink_by;
-              const v_prev_x = inPt.x - inPrev.x, v_prev_y = inPt.y - inPrev.y;
-              const v_next_x = inNext.x - inPt.x, v_next_y = inNext.y - inPt.y;
-              const v_prev_lensq = v_prev_x * v_prev_x + v_prev_y * v_prev_y;
-              const collinear0 = v_prev_x * v_next_y - v_prev_y * v_next_x;
-              if (Math.abs(collinear0) > Number.EPSILON) {
-                const v_prev_len = Math.sqrt(v_prev_lensq);
-                const v_next_len = Math.sqrt(v_next_x * v_next_x + v_next_y * v_next_y);
-                const ptPrevShift_x = inPrev.x - v_prev_y / v_prev_len;
-                const ptPrevShift_y = inPrev.y + v_prev_x / v_prev_len;
-                const ptNextShift_x = inNext.x - v_next_y / v_next_len;
-                const ptNextShift_y = inNext.y + v_next_x / v_next_len;
-                const sf = ((ptNextShift_x - ptPrevShift_x) * v_next_y - (ptNextShift_y - ptPrevShift_y) * v_next_x) / (v_prev_x * v_next_y - v_prev_y * v_next_x);
-                v_trans_x = ptPrevShift_x + v_prev_x * sf - inPt.x;
-                v_trans_y = ptPrevShift_y + v_prev_y * sf - inPt.y;
-                const v_trans_lensq = v_trans_x * v_trans_x + v_trans_y * v_trans_y;
-                if (v_trans_lensq <= 2) {
-                  return new Vector2(v_trans_x, v_trans_y);
-                } else {
-                  shrink_by = Math.sqrt(v_trans_lensq / 2);
-                }
-              } else {
-                let direction_eq = false;
-                if (v_prev_x > Number.EPSILON) {
-                  if (v_next_x > Number.EPSILON) {
-                    direction_eq = true;
-                  }
-                } else {
-                  if (v_prev_x < -Number.EPSILON) {
-                    if (v_next_x < -Number.EPSILON) {
-                      direction_eq = true;
-                    }
-                  } else {
-                    if (Math.sign(v_prev_y) === Math.sign(v_next_y)) {
-                      direction_eq = true;
-                    }
-                  }
-                }
-                if (direction_eq) {
-                  v_trans_x = -v_prev_y;
-                  v_trans_y = v_prev_x;
-                  shrink_by = Math.sqrt(v_prev_lensq);
-                } else {
-                  v_trans_x = v_prev_x;
-                  v_trans_y = v_prev_y;
-                  shrink_by = Math.sqrt(v_prev_lensq / 2);
-                }
-              }
-              return new Vector2(v_trans_x / shrink_by, v_trans_y / shrink_by);
-            }
-            const contourMovements = [];
-            for (let i = 0, il = contour.length, j = il - 1, k = i + 1; i < il; i++, j++, k++) {
-              if (j === il) j = 0;
-              if (k === il) k = 0;
-              contourMovements[i] = getBevelVec(contour[i], contour[j], contour[k]);
-            }
-            const holesMovements = [];
-            let oneHoleMovements, verticesMovements = contourMovements.concat();
-            for (let h = 0, hl = numHoles; h < hl; h++) {
-              const ahole = holes[h];
-              oneHoleMovements = [];
-              for (let i = 0, il = ahole.length, j = il - 1, k = i + 1; i < il; i++, j++, k++) {
-                if (j === il) j = 0;
-                if (k === il) k = 0;
-                oneHoleMovements[i] = getBevelVec(ahole[i], ahole[j], ahole[k]);
-              }
-              holesMovements.push(oneHoleMovements);
-              verticesMovements = verticesMovements.concat(oneHoleMovements);
-            }
-            let faces;
-            if (bevelSegments === 0) {
-              faces = ShapeUtils.triangulateShape(contour, holes);
-            } else {
-              const contractedContourVertices = [];
-              const expandedHoleVertices = [];
-              for (let b = 0; b < bevelSegments; b++) {
-                const t = b / bevelSegments;
-                const z = bevelThickness * Math.cos(t * Math.PI / 2);
-                const bs2 = bevelSize * Math.sin(t * Math.PI / 2) + bevelOffset;
-                for (let i = 0, il = contour.length; i < il; i++) {
-                  const vert = scalePt2(contour[i], contourMovements[i], bs2);
-                  v(vert.x, vert.y, -z);
-                  if (t === 0) contractedContourVertices.push(vert);
-                }
-                for (let h = 0, hl = numHoles; h < hl; h++) {
-                  const ahole = holes[h];
-                  oneHoleMovements = holesMovements[h];
-                  const oneHoleVertices = [];
-                  for (let i = 0, il = ahole.length; i < il; i++) {
-                    const vert = scalePt2(ahole[i], oneHoleMovements[i], bs2);
-                    v(vert.x, vert.y, -z);
-                    if (t === 0) oneHoleVertices.push(vert);
-                  }
-                  if (t === 0) expandedHoleVertices.push(oneHoleVertices);
-                }
-              }
-              faces = ShapeUtils.triangulateShape(contractedContourVertices, expandedHoleVertices);
-            }
-            const flen = faces.length;
-            const bs = bevelSize + bevelOffset;
-            for (let i = 0; i < vlen; i++) {
-              const vert = bevelEnabled ? scalePt2(vertices[i], verticesMovements[i], bs) : vertices[i];
-              if (!extrudeByPath) {
-                v(vert.x, vert.y, 0);
-              } else {
-                normal.copy(splineTube.normals[0]).multiplyScalar(vert.x);
-                binormal.copy(splineTube.binormals[0]).multiplyScalar(vert.y);
-                position2.copy(extrudePts[0]).add(normal).add(binormal);
-                v(position2.x, position2.y, position2.z);
-              }
-            }
-            for (let s = 1; s <= steps; s++) {
-              for (let i = 0; i < vlen; i++) {
-                const vert = bevelEnabled ? scalePt2(vertices[i], verticesMovements[i], bs) : vertices[i];
-                if (!extrudeByPath) {
-                  v(vert.x, vert.y, depth / steps * s);
-                } else {
-                  normal.copy(splineTube.normals[s]).multiplyScalar(vert.x);
-                  binormal.copy(splineTube.binormals[s]).multiplyScalar(vert.y);
-                  position2.copy(extrudePts[s]).add(normal).add(binormal);
-                  v(position2.x, position2.y, position2.z);
-                }
-              }
-            }
-            for (let b = bevelSegments - 1; b >= 0; b--) {
-              const t = b / bevelSegments;
-              const z = bevelThickness * Math.cos(t * Math.PI / 2);
-              const bs2 = bevelSize * Math.sin(t * Math.PI / 2) + bevelOffset;
-              for (let i = 0, il = contour.length; i < il; i++) {
-                const vert = scalePt2(contour[i], contourMovements[i], bs2);
-                v(vert.x, vert.y, depth + z);
-              }
-              for (let h = 0, hl = holes.length; h < hl; h++) {
-                const ahole = holes[h];
-                oneHoleMovements = holesMovements[h];
-                for (let i = 0, il = ahole.length; i < il; i++) {
-                  const vert = scalePt2(ahole[i], oneHoleMovements[i], bs2);
-                  if (!extrudeByPath) {
-                    v(vert.x, vert.y, depth + z);
-                  } else {
-                    v(vert.x, vert.y + extrudePts[steps - 1].y, extrudePts[steps - 1].x + z);
-                  }
-                }
-              }
-            }
-            buildLidFaces();
-            buildSideFaces();
-            function buildLidFaces() {
-              const start = verticesArray.length / 3;
-              if (bevelEnabled) {
-                let layer = 0;
-                let offset = vlen * layer;
-                for (let i = 0; i < flen; i++) {
-                  const face = faces[i];
-                  f3(face[2] + offset, face[1] + offset, face[0] + offset);
-                }
-                layer = steps + bevelSegments * 2;
-                offset = vlen * layer;
-                for (let i = 0; i < flen; i++) {
-                  const face = faces[i];
-                  f3(face[0] + offset, face[1] + offset, face[2] + offset);
-                }
-              } else {
-                for (let i = 0; i < flen; i++) {
-                  const face = faces[i];
-                  f3(face[2], face[1], face[0]);
-                }
-                for (let i = 0; i < flen; i++) {
-                  const face = faces[i];
-                  f3(face[0] + vlen * steps, face[1] + vlen * steps, face[2] + vlen * steps);
-                }
-              }
-              scope.addGroup(start, verticesArray.length / 3 - start, 0);
-            }
-            function buildSideFaces() {
-              const start = verticesArray.length / 3;
-              let layeroffset = 0;
-              sidewalls(contour, layeroffset);
-              layeroffset += contour.length;
-              for (let h = 0, hl = holes.length; h < hl; h++) {
-                const ahole = holes[h];
-                sidewalls(ahole, layeroffset);
-                layeroffset += ahole.length;
-              }
-              scope.addGroup(start, verticesArray.length / 3 - start, 1);
-            }
-            function sidewalls(contour2, layeroffset) {
-              let i = contour2.length;
-              while (--i >= 0) {
-                const j = i;
-                let k = i - 1;
-                if (k < 0) k = contour2.length - 1;
-                for (let s = 0, sl = steps + bevelSegments * 2; s < sl; s++) {
-                  const slen1 = vlen * s;
-                  const slen2 = vlen * (s + 1);
-                  const a = layeroffset + j + slen1, b = layeroffset + k + slen1, c = layeroffset + k + slen2, d = layeroffset + j + slen2;
-                  f4(a, b, c, d);
-                }
-              }
-            }
-            function v(x, y, z) {
-              placeholder.push(x);
-              placeholder.push(y);
-              placeholder.push(z);
-            }
-            function f3(a, b, c) {
-              addVertex(a);
-              addVertex(b);
-              addVertex(c);
-              const nextIndex = verticesArray.length / 3;
-              const uvs = uvgen.generateTopUV(scope, verticesArray, nextIndex - 3, nextIndex - 2, nextIndex - 1);
-              addUV(uvs[0]);
-              addUV(uvs[1]);
-              addUV(uvs[2]);
-            }
-            function f4(a, b, c, d) {
-              addVertex(a);
-              addVertex(b);
-              addVertex(d);
-              addVertex(b);
-              addVertex(c);
-              addVertex(d);
-              const nextIndex = verticesArray.length / 3;
-              const uvs = uvgen.generateSideWallUV(scope, verticesArray, nextIndex - 6, nextIndex - 3, nextIndex - 2, nextIndex - 1);
-              addUV(uvs[0]);
-              addUV(uvs[1]);
-              addUV(uvs[3]);
-              addUV(uvs[1]);
-              addUV(uvs[2]);
-              addUV(uvs[3]);
-            }
-            function addVertex(index) {
-              verticesArray.push(placeholder[index * 3 + 0]);
-              verticesArray.push(placeholder[index * 3 + 1]);
-              verticesArray.push(placeholder[index * 3 + 2]);
-            }
-            function addUV(vector2) {
-              uvArray.push(vector2.x);
-              uvArray.push(vector2.y);
-            }
-          }
-        }
-        copy(source) {
-          super.copy(source);
-          this.parameters = Object.assign({}, source.parameters);
-          return this;
-        }
-        toJSON() {
-          const data = super.toJSON();
-          const shapes = this.parameters.shapes;
-          const options = this.parameters.options;
-          return toJSON(shapes, options, data);
-        }
-        /**
-         * Factory method for creating an instance of this class from the given
-         * JSON object.
-         *
-         * @param {Object} data - A JSON object representing the serialized geometry.
-         * @param {Array<Shape>} shapes - An array of shapes.
-         * @return {ExtrudeGeometry} A new instance.
-         */
-        static fromJSON(data, shapes) {
-          const geometryShapes = [];
-          for (let j = 0, jl = data.shapes.length; j < jl; j++) {
-            const shape = shapes[data.shapes[j]];
-            geometryShapes.push(shape);
-          }
-          const extrudePath = data.options.extrudePath;
-          if (extrudePath !== void 0) {
-            data.options.extrudePath = new Curves_exports[extrudePath.type]().fromJSON(extrudePath);
-          }
-          return new _ExtrudeGeometry(geometryShapes, data.options);
-        }
-      };
-      WorldUVGenerator = {
-        generateTopUV: function(geometry, vertices, indexA, indexB, indexC) {
-          const a_x = vertices[indexA * 3];
-          const a_y = vertices[indexA * 3 + 1];
-          const b_x = vertices[indexB * 3];
-          const b_y = vertices[indexB * 3 + 1];
-          const c_x = vertices[indexC * 3];
-          const c_y = vertices[indexC * 3 + 1];
-          return [
-            new Vector2(a_x, a_y),
-            new Vector2(b_x, b_y),
-            new Vector2(c_x, c_y)
-          ];
-        },
-        generateSideWallUV: function(geometry, vertices, indexA, indexB, indexC, indexD) {
-          const a_x = vertices[indexA * 3];
-          const a_y = vertices[indexA * 3 + 1];
-          const a_z = vertices[indexA * 3 + 2];
-          const b_x = vertices[indexB * 3];
-          const b_y = vertices[indexB * 3 + 1];
-          const b_z = vertices[indexB * 3 + 2];
-          const c_x = vertices[indexC * 3];
-          const c_y = vertices[indexC * 3 + 1];
-          const c_z = vertices[indexC * 3 + 2];
-          const d_x = vertices[indexD * 3];
-          const d_y = vertices[indexD * 3 + 1];
-          const d_z = vertices[indexD * 3 + 2];
-          if (Math.abs(a_y - b_y) < Math.abs(a_x - b_x)) {
-            return [
-              new Vector2(a_x, 1 - a_z),
-              new Vector2(b_x, 1 - b_z),
-              new Vector2(c_x, 1 - c_z),
-              new Vector2(d_x, 1 - d_z)
-            ];
-          } else {
-            return [
-              new Vector2(a_y, 1 - a_z),
-              new Vector2(b_y, 1 - b_z),
-              new Vector2(c_y, 1 - c_z),
-              new Vector2(d_y, 1 - d_z)
-            ];
-          }
-        }
-      };
     }
   });
 
@@ -16679,7 +16055,7 @@ var GeoTeachApp = (() => {
   });
 
   // vendor/three/src/geometries/ShapeGeometry.js
-  function toJSON2(shapes, data) {
+  function toJSON(shapes, data) {
     data.shapes = [];
     if (Array.isArray(shapes)) {
       for (let i = 0, l = shapes.length; i < l; i++) {
@@ -16776,7 +16152,7 @@ var GeoTeachApp = (() => {
         toJSON() {
           const data = super.toJSON();
           const shapes = this.parameters.shapes;
-          return toJSON2(shapes, data);
+          return toJSON(shapes, data);
         }
         /**
          * Factory method for creating an instance of this class from the given
@@ -16799,77 +16175,85 @@ var GeoTeachApp = (() => {
   });
 
   // vendor/three/src/geometries/SphereGeometry.js
-  var SphereGeometry;
   var init_SphereGeometry = __esm({
     "vendor/three/src/geometries/SphereGeometry.js"() {
       init_BufferGeometry();
       init_BufferAttribute();
       init_Vector3();
-      SphereGeometry = class _SphereGeometry extends BufferGeometry {
+    }
+  });
+
+  // vendor/three/src/geometries/TetrahedronGeometry.js
+  var init_TetrahedronGeometry = __esm({
+    "vendor/three/src/geometries/TetrahedronGeometry.js"() {
+      init_PolyhedronGeometry();
+    }
+  });
+
+  // vendor/three/src/geometries/TorusGeometry.js
+  var TorusGeometry;
+  var init_TorusGeometry = __esm({
+    "vendor/three/src/geometries/TorusGeometry.js"() {
+      init_BufferGeometry();
+      init_BufferAttribute();
+      init_Vector3();
+      TorusGeometry = class _TorusGeometry extends BufferGeometry {
         /**
-         * Constructs a new sphere geometry.
+         * Constructs a new torus geometry.
          *
-         * @param {number} [radius=1] - The sphere radius.
-         * @param {number} [widthSegments=32] - The number of horizontal segments. Minimum value is `3`.
-         * @param {number} [heightSegments=16] - The number of vertical segments. Minimum value is `2`.
-         * @param {number} [phiStart=0] - The horizontal starting angle in radians.
-         * @param {number} [phiLength=Math.PI*2] - The horizontal sweep angle size.
-         * @param {number} [thetaStart=0] - The vertical starting angle in radians.
-         * @param {number} [thetaLength=Math.PI] - The vertical sweep angle size.
+         * @param {number} [radius=1] - Radius of the torus, from the center of the torus to the center of the tube.
+         * @param {number} [tube=0.4] - Radius of the tube. Must be smaller than `radius`.
+         * @param {number} [radialSegments=12] - The number of radial segments.
+         * @param {number} [tubularSegments=48] - The number of tubular segments.
+         * @param {number} [arc=Math.PI*2] - Central angle in radians.
+         * @param {number} [thetaStart=0] - Start of the tubular sweep in radians.
+         * @param {number} [thetaLength=Math.PI*2] - Length of the tubular sweep in radians.
          */
-        constructor(radius = 1, widthSegments = 32, heightSegments = 16, phiStart = 0, phiLength = Math.PI * 2, thetaStart = 0, thetaLength = Math.PI) {
+        constructor(radius = 1, tube = 0.4, radialSegments = 12, tubularSegments = 48, arc = Math.PI * 2, thetaStart = 0, thetaLength = Math.PI * 2) {
           super();
-          this.type = "SphereGeometry";
+          this.type = "TorusGeometry";
           this.parameters = {
             radius,
-            widthSegments,
-            heightSegments,
-            phiStart,
-            phiLength,
+            tube,
+            radialSegments,
+            tubularSegments,
+            arc,
             thetaStart,
             thetaLength
           };
-          widthSegments = Math.max(3, Math.floor(widthSegments));
-          heightSegments = Math.max(2, Math.floor(heightSegments));
-          const thetaEnd = Math.min(thetaStart + thetaLength, Math.PI);
-          let index = 0;
-          const grid = [];
-          const vertex19 = new Vector3();
-          const normal = new Vector3();
+          radialSegments = Math.floor(radialSegments);
+          tubularSegments = Math.floor(tubularSegments);
           const indices = [];
           const vertices = [];
           const normals = [];
           const uvs = [];
-          for (let iy = 0; iy <= heightSegments; iy++) {
-            const verticesRow = [];
-            const v = iy / heightSegments;
-            let uOffset = 0;
-            if (iy === 0 && thetaStart === 0) {
-              uOffset = 0.5 / widthSegments;
-            } else if (iy === heightSegments && thetaEnd === Math.PI) {
-              uOffset = -0.5 / widthSegments;
-            }
-            for (let ix = 0; ix <= widthSegments; ix++) {
-              const u = ix / widthSegments;
-              vertex19.x = -radius * Math.cos(phiStart + u * phiLength) * Math.sin(thetaStart + v * thetaLength);
-              vertex19.y = radius * Math.cos(thetaStart + v * thetaLength);
-              vertex19.z = radius * Math.sin(phiStart + u * phiLength) * Math.sin(thetaStart + v * thetaLength);
+          const center = new Vector3();
+          const vertex19 = new Vector3();
+          const normal = new Vector3();
+          for (let j = 0; j <= radialSegments; j++) {
+            const v = thetaStart + j / radialSegments * thetaLength;
+            for (let i = 0; i <= tubularSegments; i++) {
+              const u = i / tubularSegments * arc;
+              vertex19.x = (radius + tube * Math.cos(v)) * Math.cos(u);
+              vertex19.y = (radius + tube * Math.cos(v)) * Math.sin(u);
+              vertex19.z = tube * Math.sin(v);
               vertices.push(vertex19.x, vertex19.y, vertex19.z);
-              normal.copy(vertex19).normalize();
+              center.x = radius * Math.cos(u);
+              center.y = radius * Math.sin(u);
+              normal.subVectors(vertex19, center).normalize();
               normals.push(normal.x, normal.y, normal.z);
-              uvs.push(u + uOffset, 1 - v);
-              verticesRow.push(index++);
+              uvs.push(i / tubularSegments);
+              uvs.push(j / radialSegments);
             }
-            grid.push(verticesRow);
           }
-          for (let iy = 0; iy < heightSegments; iy++) {
-            for (let ix = 0; ix < widthSegments; ix++) {
-              const a = grid[iy][ix + 1];
-              const b = grid[iy][ix];
-              const c = grid[iy + 1][ix];
-              const d = grid[iy + 1][ix + 1];
-              if (iy !== 0 || thetaStart > 0) indices.push(a, b, d);
-              if (iy !== heightSegments - 1 || thetaEnd < Math.PI) indices.push(b, c, d);
+          for (let j = 1; j <= radialSegments; j++) {
+            for (let i = 1; i <= tubularSegments; i++) {
+              const a = (tubularSegments + 1) * j + i - 1;
+              const b = (tubularSegments + 1) * (j - 1) + i - 1;
+              const c = (tubularSegments + 1) * (j - 1) + i;
+              const d = (tubularSegments + 1) * j + i;
+              indices.push(a, b, d);
+              indices.push(b, c, d);
             }
           }
           this.setIndex(indices);
@@ -16887,28 +16271,12 @@ var GeoTeachApp = (() => {
          * JSON object.
          *
          * @param {Object} data - A JSON object representing the serialized geometry.
-         * @return {SphereGeometry} A new instance.
+         * @return {TorusGeometry} A new instance.
          */
         static fromJSON(data) {
-          return new _SphereGeometry(data.radius, data.widthSegments, data.heightSegments, data.phiStart, data.phiLength, data.thetaStart, data.thetaLength);
+          return new _TorusGeometry(data.radius, data.tube, data.radialSegments, data.tubularSegments, data.arc);
         }
       };
-    }
-  });
-
-  // vendor/three/src/geometries/TetrahedronGeometry.js
-  var init_TetrahedronGeometry = __esm({
-    "vendor/three/src/geometries/TetrahedronGeometry.js"() {
-      init_PolyhedronGeometry();
-    }
-  });
-
-  // vendor/three/src/geometries/TorusGeometry.js
-  var init_TorusGeometry = __esm({
-    "vendor/three/src/geometries/TorusGeometry.js"() {
-      init_BufferGeometry();
-      init_BufferAttribute();
-      init_Vector3();
     }
   });
 
@@ -19469,7 +18837,7 @@ void main() {
   });
 
   // vendor/three/src/cameras/Camera.js
-  var _position3, _quaternion4, _scale2, Camera;
+  var _position2, _quaternion4, _scale2, Camera;
   var init_Camera = __esm({
     "vendor/three/src/cameras/Camera.js"() {
       init_constants();
@@ -19477,7 +18845,7 @@ void main() {
       init_Object3D();
       init_Vector3();
       init_Quaternion();
-      _position3 = /* @__PURE__ */ new Vector3();
+      _position2 = /* @__PURE__ */ new Vector3();
       _quaternion4 = /* @__PURE__ */ new Quaternion();
       _scale2 = /* @__PURE__ */ new Vector3();
       Camera = class extends Object3D {
@@ -19525,20 +18893,20 @@ void main() {
         }
         updateMatrixWorld(force) {
           super.updateMatrixWorld(force);
-          this.matrixWorld.decompose(_position3, _quaternion4, _scale2);
+          this.matrixWorld.decompose(_position2, _quaternion4, _scale2);
           if (_scale2.x === 1 && _scale2.y === 1 && _scale2.z === 1) {
             this.matrixWorldInverse.copy(this.matrixWorld).invert();
           } else {
-            this.matrixWorldInverse.compose(_position3, _quaternion4, _scale2.set(1, 1, 1)).invert();
+            this.matrixWorldInverse.compose(_position2, _quaternion4, _scale2.set(1, 1, 1)).invert();
           }
         }
         updateWorldMatrix(updateParents, updateChildren) {
           super.updateWorldMatrix(updateParents, updateChildren);
-          this.matrixWorld.decompose(_position3, _quaternion4, _scale2);
+          this.matrixWorld.decompose(_position2, _quaternion4, _scale2);
           if (_scale2.x === 1 && _scale2.y === 1 && _scale2.z === 1) {
             this.matrixWorldInverse.copy(this.matrixWorld).invert();
           } else {
-            this.matrixWorldInverse.compose(_position3, _quaternion4, _scale2.set(1, 1, 1)).invert();
+            this.matrixWorldInverse.compose(_position2, _quaternion4, _scale2.set(1, 1, 1)).invert();
           }
         }
         clone() {
@@ -21072,73 +20440,9 @@ void main() {
   });
 
   // vendor/three/src/core/Clock.js
-  var Clock;
   var init_Clock = __esm({
     "vendor/three/src/core/Clock.js"() {
       init_utils();
-      Clock = class {
-        /**
-         * Constructs a new clock.
-         *
-         * @deprecated since 183.
-         * @param {boolean} [autoStart=true] - Whether to automatically start the clock when
-         * `getDelta()` is called for the first time.
-         */
-        constructor(autoStart = true) {
-          this.autoStart = autoStart;
-          this.startTime = 0;
-          this.oldTime = 0;
-          this.elapsedTime = 0;
-          this.running = false;
-          warn("Clock: This module has been deprecated. Please use THREE.Timer instead.");
-        }
-        /**
-         * Starts the clock. When `autoStart` is set to `true`, the method is automatically
-         * called by the class.
-         */
-        start() {
-          this.startTime = performance.now();
-          this.oldTime = this.startTime;
-          this.elapsedTime = 0;
-          this.running = true;
-        }
-        /**
-         * Stops the clock.
-         */
-        stop() {
-          this.getElapsedTime();
-          this.running = false;
-          this.autoStart = false;
-        }
-        /**
-         * Returns the elapsed time in seconds.
-         *
-         * @return {number} The elapsed time.
-         */
-        getElapsedTime() {
-          this.getDelta();
-          return this.elapsedTime;
-        }
-        /**
-         * Returns the delta time in seconds.
-         *
-         * @return {number} The delta time.
-         */
-        getDelta() {
-          let diff = 0;
-          if (this.autoStart && !this.running) {
-            this.start();
-            return 0;
-          }
-          if (this.running) {
-            const newTime = performance.now();
-            diff = (newTime - this.oldTime) / 1e3;
-            this.oldTime = newTime;
-            this.elapsedTime += diff;
-          }
-          return diff;
-        }
-      };
     }
   });
 
@@ -41617,14 +40921,14 @@ void main() {
       document2.removeEventListener("keyup", this._interceptControlUp, { passive: true, capture: true });
     }
   }
-  var _changeEvent, _startEvent, _endEvent, _ray4, _plane, _TILT_LIMIT, _v, _twoPI, _STATE, _EPS, OrbitControls;
+  var _changeEvent, _startEvent, _endEvent, _ray3, _plane, _TILT_LIMIT, _v, _twoPI, _STATE, _EPS, OrbitControls;
   var init_OrbitControls = __esm({
     "vendor/three/examples/jsm/controls/OrbitControls.js"() {
       init_three_module();
       _changeEvent = { type: "change" };
       _startEvent = { type: "start" };
       _endEvent = { type: "end" };
-      _ray4 = new Ray();
+      _ray3 = new Ray();
       _plane = new Plane();
       _TILT_LIMIT = Math.cos(70 * MathUtils.DEG2RAD);
       _v = new Vector3();
@@ -41964,13 +41268,13 @@ void main() {
               if (this.screenSpacePanning) {
                 this.target.set(0, 0, -1).transformDirection(this.object.matrix).multiplyScalar(newRadius).add(this.object.position);
               } else {
-                _ray4.origin.copy(this.object.position);
-                _ray4.direction.set(0, 0, -1).transformDirection(this.object.matrix);
-                if (Math.abs(this.object.up.dot(_ray4.direction)) < _TILT_LIMIT) {
+                _ray3.origin.copy(this.object.position);
+                _ray3.direction.set(0, 0, -1).transformDirection(this.object.matrix);
+                if (Math.abs(this.object.up.dot(_ray3.direction)) < _TILT_LIMIT) {
                   this.object.lookAt(this.target);
                 } else {
                   _plane.setFromNormalAndCoplanarPoint(this.object.up, this.target);
-                  _ray4.intersectPlane(_plane, this.target);
+                  _ray3.intersectPlane(_plane, this.target);
                 }
               }
             }
@@ -43498,9 +42802,7 @@ void main() {
     return clamp2(
       S.indiaWestMeanX + largeBend + midBend - bayA - bayB + headland + micro,
       -44,
-      // 浅海不超过此左边界
       -18
-      // 浅海不超过此右边界（确保浅海宽度）
     );
   }
   function indiaEastCoast(z) {
@@ -43577,7 +42879,6 @@ void main() {
     const crestMask = clamp2(mainCross * 1.3, 0, 1);
     const flankMask = clamp2(shoulderL + shoulderR, 0, 0.9);
     const inRangeX = clamp2(1 - smoothstep2(0, mountainHalfWidth * 2, distFromSpine), 0, 1);
-    const leftFade = clamp2(1 - smoothstep2(-mountainHalfWidth * 0.5, -mountainHalfWidth, distFromSpine - mountainHalfWidth * 0), 0, 1);
     const edgeFade = smoothstep2(S.halfDepth, S.halfDepth - 10, Math.abs(z));
     const rangeEnvelope = inRangeX * edgeFade;
     return { spineX, distFromSpine, rangeMask, crestMask, flankMask, rangeEnvelope };
@@ -43601,17 +42902,11 @@ void main() {
     const nz = (z + S.halfDepth) / S.depth;
     const PEAKS = [
       { c: 0.08, h: 0.55, w: 0.07 },
-      // 峰1：后侧小峰（末梢）
       { c: 0.22, h: 0.82, w: 0.08 },
-      // 峰2：后段主峰
       { c: 0.38, h: 1, w: 0.09 },
-      // 峰3：最高峰（喜马拉雅珠峰）
       { c: 0.54, h: 0.88, w: 0.08 },
-      // 峰4：中段次高峰
       { c: 0.7, h: 0.72, w: 0.08 },
-      // 峰5：前段次峰
       { c: 0.88, h: 0.5, w: 0.07 }
-      // 峰6：前侧小峰（末梢）
     ];
     let peakEnvelopeZ = 0;
     for (const pk of PEAKS) {
@@ -43648,18 +42943,101 @@ void main() {
       return continentHeight(x, z);
     }
   }
-  function mantleColorAt(x, y) {
-    const dt = clamp2((y - S.mantleBottom) / (S.mantleTop - S.mantleBottom), 0, 1);
-    const swirl = 0.5 + 0.5 * Math.sin(x * 0.035 + y * 0.12);
-    const heat = clamp2(dt * 0.62 + swirl * 0.28, 0, 1);
+  function reservoirArch(x, z) {
+    const arch1 = gaussian(x, -20, 30) * 16;
+    const arch2 = gaussian(x, 62, 28) * 14;
+    const undulation = fbmNoise(x * 0.04, z * 0.03, 3, 0.04, 0.5) * 3 + Math.sin(x * 0.025 + z * 0.018) * 2.5;
+    return arch1 + arch2 + undulation;
+  }
+  function reservoirTopAt(x, z) {
+    const arch = reservoirArch(x, z);
+    return clamp2(S.reservoirTop + arch, S.reservoirBottom + 1, S.capRockTop - 2);
+  }
+  function waterproofTopAt(x, z) {
+    const arch = reservoirArch(x, z) * 0.65;
+    return clamp2(S.waterproofTop + arch, S.basementTop + 0.5, S.reservoirBottom + 15);
+  }
+  function reservoirBottomAt(x, z) {
+    return waterproofTopAt(x, z);
+  }
+  function waterOilBoundAt(x, z) {
+    const archBottom = reservoirBottomAt(x, z);
+    const archTop = reservoirTopAt(x, z);
+    const thickness = archTop - archBottom;
+    return archBottom + thickness * 0.35;
+  }
+  function oilGasBoundAt(x, z) {
+    const archBottom = reservoirBottomAt(x, z);
+    const archTop = reservoirTopAt(x, z);
+    const thickness = archTop - archBottom;
+    return archBottom + thickness * 0.7;
+  }
+  function surfaceRockColor(x, y, z) {
+    const layer = clamp2((y - S.lithBottom) / (S.surfaceRockTop - S.lithBottom), 0, 1);
+    const grain = fbmNoise(x * 0.15, z * 0.15, 3, 0.1, 0.5) * 0.06;
+    const stripe = Math.sin(y * 1.8 + x * 0.05) * 0.03 + Math.cos(y * 2.6 - z * 0.03) * 0.02;
     return new Color(
-      mix(0.24, 1, heat),
-      mix(0.04, 0.44, heat * heat),
-      mix(0.01, 0.08, heat * 0.35)
+      clamp2(0.72 + layer * 0.08 + grain + stripe, 0, 1),
+      clamp2(0.58 + layer * 0.06 + grain * 0.8 + stripe * 0.7, 0, 1),
+      clamp2(0.34 + layer * 0.04 + grain * 0.4, 0, 1)
+    );
+  }
+  function capRockColor(x, y, z) {
+    const layer = clamp2((y - S.capRockBottom) / (S.capRockTop - S.capRockBottom), 0, 1);
+    const grain = fbmNoise(x * 0.12, z * 0.14, 3, 0.08, 0.5) * 0.04;
+    const stripe = Math.sin(y * 2.2 + x * 0.04) * 0.025;
+    return new Color(
+      clamp2(0.42 + layer * 0.1 + grain + stripe, 0, 1),
+      clamp2(0.3 + layer * 0.07 + grain * 0.7 + stripe, 0, 1),
+      clamp2(0.18 + layer * 0.04 + grain * 0.3, 0, 1)
+    );
+  }
+  function waterZoneColor(x, y, z) {
+    const grain = fbmNoise(x * 0.18, z * 0.16, 3, 0.12, 0.5) * 0.03;
+    return new Color(
+      clamp2(0.06 + grain, 0, 1),
+      clamp2(0.18 + grain * 0.5, 0, 1),
+      clamp2(0.55 + grain * 0.3, 0, 1)
+    );
+  }
+  function oilZoneColor(x, y, z) {
+    const grain = fbmNoise(x * 0.2, z * 0.18, 3, 0.13, 0.5) * 0.02;
+    const sheen = Math.sin(x * 0.15 + z * 0.12) * 0.01;
+    return new Color(
+      clamp2(0.04 + grain + sheen, 0, 1),
+      clamp2(0.03 + grain * 0.5, 0, 1),
+      clamp2(0.02 + grain * 0.2, 0, 1)
+    );
+  }
+  function gasZoneColor(x, y, z) {
+    const grain = fbmNoise(x * 0.16, z * 0.14, 3, 0.1, 0.5) * 0.04;
+    return new Color(
+      clamp2(0.62 + grain, 0, 1),
+      clamp2(0.62 + grain * 0.8, 0, 1),
+      clamp2(0.62 + grain * 0.6, 0, 1)
+    );
+  }
+  function waterproofLayerColor(x, y, z) {
+    const layer = clamp2((y - S.waterproofBottom) / (S.waterproofTop - S.waterproofBottom), 0, 1);
+    const grain = fbmNoise(x * 0.1, z * 0.1, 3, 0.06, 0.5) * 0.04;
+    const stripe = Math.sin(y * 1.5 + x * 0.03) * 0.02;
+    return new Color(
+      clamp2(0.32 + layer * 0.06 + grain + stripe, 0, 1),
+      clamp2(0.24 + layer * 0.05 + grain * 0.6, 0, 1),
+      clamp2(0.17 + layer * 0.03 + grain * 0.3, 0, 1)
+    );
+  }
+  function basementRockColor(x, y, z) {
+    const layer = clamp2((y - S.basementBottom) / (S.basementTop - S.basementBottom), 0, 1);
+    const grain = fbmNoise(x * 0.08, z * 0.08, 3, 0.05, 0.5) * 0.03;
+    return new Color(
+      clamp2(0.18 + layer * 0.08 + grain, 0, 1),
+      clamp2(0.14 + layer * 0.06 + grain * 0.6, 0, 1),
+      clamp2(0.12 + layer * 0.04 + grain * 0.4, 0, 1)
     );
   }
   function oceanCrustColorAt(x, y) {
-    const warmth = gaussian(x, S.ridgeX, 18) * 0.2 + gaussian(x, S.indiaWestMeanX - 6, 8) * 0.08;
+    const warmth = gaussian(x, S.ridgeX, 18) * 0.2;
     const depthT = clamp2((y - S.lithBottom) / (S.seaLevel - S.lithBottom), 0, 1);
     return new Color(
       0.12 + depthT * 0.05 + warmth * 0.22,
@@ -43778,7 +43156,7 @@ void main() {
     );
   }
   function bayWaterColorAt(x, y, z) {
-    return new Color(0.04, 0.2, 0.48);
+    return new Color(0.03, 0.12, 0.32);
   }
   function assignVertexColors(geometry, colorFn) {
     const positions = geometry.getAttribute("position");
@@ -43805,28 +43183,6 @@ void main() {
       points.push(new Vector2(x, heightFn(x, zValue)));
     }
     return points;
-  }
-  function createSolidSection(profile, bottomY, colorFn, materialOptions = {}) {
-    const shape = new Shape();
-    shape.moveTo(profile[0].x, bottomY);
-    shape.lineTo(profile[0].x, profile[0].y);
-    for (let i = 1; i < profile.length; i++) shape.lineTo(profile[i].x, profile[i].y);
-    shape.lineTo(profile[profile.length - 1].x, bottomY);
-    shape.closePath();
-    const geometry = new ShapeGeometry(shape, 180);
-    geometry.computeVertexNormals();
-    assignVertexColors(geometry, (x, y) => colorFn(x, y));
-    const material = new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.9,
-      metalness: 0.02,
-      side: DoubleSide,
-      ...materialOptions
-    });
-    const mesh = new Mesh(geometry, material);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
   }
   function createFilledSection(topProfile, bottomProfile, colorFn, materialOptions = {}) {
     const shape = new Shape();
@@ -43874,53 +43230,6 @@ void main() {
     mesh.castShadow = true;
     mesh.receiveShadow = true;
     return mesh;
-  }
-  function createGlowStrip(width, height, color, opacity) {
-    return new Mesh(
-      new PlaneGeometry(width, height),
-      new MeshBasicMaterial({
-        color,
-        transparent: true,
-        opacity,
-        depthWrite: false,
-        blending: AdditiveBlending,
-        side: DoubleSide
-      })
-    );
-  }
-  function createArrowGlyph(color = 7657727, dir = 1, scale = 1) {
-    const group = new Group();
-    const material = new MeshBasicMaterial({
-      color,
-      transparent: true,
-      opacity: 0.9,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      side: DoubleSide
-    });
-    const bodyLen = 13.5 * scale, bodyW = 2.4 * scale, headR = 4.2 * scale, headL = 9 * scale;
-    const body = new Mesh(new PlaneGeometry(bodyLen, bodyW), material);
-    const head = new Mesh(new ConeGeometry(headR, headL, 3), material);
-    body.rotation.x = -Math.PI * 0.5;
-    head.rotation.x = -Math.PI * 0.5;
-    head.rotation.z = dir === 1 ? -Math.PI * 0.5 : Math.PI * 0.5;
-    head.position.x = dir * (bodyLen * 0.5 + headL * 0.3);
-    if (dir === -1) body.position.x = 0;
-    group.add(body, head);
-    return group;
-  }
-  function createConvectionVortex(cx, cy, radiusX, radiusY, color, opacity) {
-    const curve = new EllipseCurve(cx, cy, radiusX, radiusY, 0, Math.PI * 2, false, 0);
-    const points = curve.getPoints(72);
-    const geometry = new BufferGeometry().setFromPoints(points);
-    const material = new LineBasicMaterial({
-      color,
-      transparent: true,
-      opacity,
-      blending: AdditiveBlending,
-      depthWrite: false
-    });
-    return new Line(geometry, material);
   }
   function createShorelineFoam() {
     const points = [];
@@ -44011,13 +43320,13 @@ void main() {
     const material = new MeshPhysicalMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.7,
-      roughness: 0.6,
+      opacity: 0.55,
+      roughness: 0.62,
       metalness: 0.02,
       ior: 1.33,
-      thickness: 0.5,
-      clearcoat: 0.06,
-      clearcoatRoughness: 0.78,
+      thickness: 0.4,
+      clearcoat: 0.04,
+      clearcoatRoughness: 0.85,
       side: DoubleSide,
       ...materialOptions
     });
@@ -44038,31 +43347,162 @@ void main() {
       const y = terrainHeightAt(x, z);
       profilePoints.push(new Vector2(x, y));
     }
-    const mantleShape = new Shape();
-    mantleShape.moveTo(S.xMin, S.mantleBottom);
-    mantleShape.lineTo(S.xMax, S.mantleBottom);
-    mantleShape.lineTo(S.xMax, S.mantleTop);
-    mantleShape.lineTo(S.xMin, S.mantleTop);
-    mantleShape.closePath();
-    const mantleGeo = new ShapeGeometry(mantleShape, 80);
-    mantleGeo.computeVertexNormals();
-    assignVertexColors(mantleGeo, (x, y) => mantleColorAt(x, y));
-    const mantleMesh = new Mesh(mantleGeo, new MeshStandardMaterial({
+    const basementShape = new Shape();
+    basementShape.moveTo(S.xMin, S.basementBottom);
+    basementShape.lineTo(S.xMax, S.basementBottom);
+    basementShape.lineTo(S.xMax, S.basementTop);
+    basementShape.lineTo(S.xMin, S.basementTop);
+    basementShape.closePath();
+    const basementGeo = new ShapeGeometry(basementShape, 60);
+    basementGeo.computeVertexNormals();
+    assignVertexColors(basementGeo, (x, y) => basementRockColor(x, y, z));
+    const basementMesh = new Mesh(basementGeo, new MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.7,
-      metalness: 0.02,
-      emissive: new Color(6036996),
-      emissiveIntensity: 1.6,
+      roughness: 0.92,
+      metalness: 0.04,
       side: DoubleSide
     }));
-    mantleMesh.position.z = z + 0.01;
-    group.add(mantleMesh);
+    basementMesh.position.z = z + 0.01;
+    group.add(basementMesh);
+    const wpSegs = 200;
+    const wpTopProfile = [];
+    for (let i = 0; i <= wpSegs; i++) {
+      const t = i / wpSegs;
+      const x = mix(S.xMin, S.xMax, t);
+      wpTopProfile.push(new Vector2(x, waterproofTopAt(x, z)));
+    }
+    const waterproofShape = new Shape();
+    waterproofShape.moveTo(S.xMin, S.waterproofBottom);
+    waterproofShape.lineTo(S.xMax, S.waterproofBottom);
+    for (let i = wpSegs; i >= 0; i--) {
+      waterproofShape.lineTo(wpTopProfile[i].x, wpTopProfile[i].y);
+    }
+    waterproofShape.closePath();
+    const waterproofGeo = new ShapeGeometry(waterproofShape, 120);
+    waterproofGeo.computeVertexNormals();
+    assignVertexColors(waterproofGeo, (x, y) => waterproofLayerColor(x, y, z));
+    const waterproofMesh = new Mesh(waterproofGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.9,
+      metalness: 0.02,
+      side: DoubleSide
+    }));
+    waterproofMesh.position.z = z + 0.02;
+    group.add(waterproofMesh);
+    const resSegs = 220;
+    const resBottomPts = [], waterOilPts = [], oilGasPts = [], resTopPts = [];
+    for (let i = 0; i <= resSegs; i++) {
+      const t = i / resSegs;
+      const x = mix(S.xMin, S.xMax, t);
+      resBottomPts.push(new Vector2(x, reservoirBottomAt(x, z)));
+      waterOilPts.push(new Vector2(x, waterOilBoundAt(x, z)));
+      oilGasPts.push(new Vector2(x, oilGasBoundAt(x, z)));
+      resTopPts.push(new Vector2(x, reservoirTopAt(x, z)));
+    }
+    const waterZoneShape = new Shape();
+    waterZoneShape.moveTo(resBottomPts[0].x, resBottomPts[0].y);
+    for (let i = 1; i <= resSegs; i++) waterZoneShape.lineTo(resBottomPts[i].x, resBottomPts[i].y);
+    for (let i = resSegs; i >= 0; i--) waterZoneShape.lineTo(waterOilPts[i].x, waterOilPts[i].y);
+    waterZoneShape.closePath();
+    const waterZoneGeo = new ShapeGeometry(waterZoneShape, 160);
+    waterZoneGeo.computeVertexNormals();
+    assignVertexColors(waterZoneGeo, (x, y) => waterZoneColor(x, y, z));
+    const waterZoneMesh = new Mesh(waterZoneGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.55,
+      metalness: 0.04,
+      emissive: new Color(2602),
+      emissiveIntensity: 0.45,
+      side: DoubleSide
+    }));
+    waterZoneMesh.position.z = z + 0.03;
+    group.add(waterZoneMesh);
+    const oilZoneShape = new Shape();
+    oilZoneShape.moveTo(waterOilPts[0].x, waterOilPts[0].y);
+    for (let i = 1; i <= resSegs; i++) oilZoneShape.lineTo(waterOilPts[i].x, waterOilPts[i].y);
+    for (let i = resSegs; i >= 0; i--) oilZoneShape.lineTo(oilGasPts[i].x, oilGasPts[i].y);
+    oilZoneShape.closePath();
+    const oilZoneGeo = new ShapeGeometry(oilZoneShape, 160);
+    oilZoneGeo.computeVertexNormals();
+    assignVertexColors(oilZoneGeo, (x, y) => oilZoneColor(x, y, z));
+    const oilZoneMesh = new Mesh(oilZoneGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.3,
+      metalness: 0.06,
+      emissive: new Color(0),
+      emissiveIntensity: 0,
+      side: DoubleSide
+    }));
+    oilZoneMesh.position.z = z + 0.035;
+    group.add(oilZoneMesh);
+    const gasZoneShape = new Shape();
+    gasZoneShape.moveTo(oilGasPts[0].x, oilGasPts[0].y);
+    for (let i = 1; i <= resSegs; i++) gasZoneShape.lineTo(oilGasPts[i].x, oilGasPts[i].y);
+    for (let i = resSegs; i >= 0; i--) gasZoneShape.lineTo(resTopPts[i].x, resTopPts[i].y);
+    gasZoneShape.closePath();
+    const gasZoneGeo = new ShapeGeometry(gasZoneShape, 160);
+    gasZoneGeo.computeVertexNormals();
+    assignVertexColors(gasZoneGeo, (x, y) => gasZoneColor(x, y, z));
+    const gasZoneMesh = new Mesh(gasZoneGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.45,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.88,
+      emissive: new Color(3158064),
+      emissiveIntensity: 0.15,
+      side: DoubleSide
+    }));
+    gasZoneMesh.position.z = z + 0.04;
+    group.add(gasZoneMesh);
+    const capSegs = 200;
+    const capBottomPts = [];
+    for (let i = 0; i <= capSegs; i++) {
+      const t = i / capSegs;
+      const x = mix(S.xMin, S.xMax, t);
+      capBottomPts.push(new Vector2(x, reservoirTopAt(x, z)));
+    }
+    const capRockShape = new Shape();
+    capRockShape.moveTo(S.xMin, S.capRockTop);
+    capRockShape.lineTo(S.xMax, S.capRockTop);
+    for (let i = capSegs; i >= 0; i--) {
+      capRockShape.lineTo(capBottomPts[i].x, capBottomPts[i].y);
+    }
+    capRockShape.closePath();
+    const capRockGeo = new ShapeGeometry(capRockShape, 140);
+    capRockGeo.computeVertexNormals();
+    assignVertexColors(capRockGeo, (x, y) => capRockColor(x, y, z));
+    const capRockMesh = new Mesh(capRockGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.88,
+      metalness: 0.02,
+      side: DoubleSide
+    }));
+    capRockMesh.position.z = z + 0.05;
+    group.add(capRockMesh);
+    const surfaceRockShape = new Shape();
+    surfaceRockShape.moveTo(S.xMin, S.lithBottom);
+    surfaceRockShape.lineTo(S.xMax, S.lithBottom);
+    surfaceRockShape.lineTo(S.xMax, S.surfaceRockTop);
+    surfaceRockShape.lineTo(S.xMin, S.surfaceRockTop);
+    surfaceRockShape.closePath();
+    const surfaceRockGeo = new ShapeGeometry(surfaceRockShape, 80);
+    surfaceRockGeo.computeVertexNormals();
+    assignVertexColors(surfaceRockGeo, (x, y) => surfaceRockColor(x, y, z));
+    const surfaceRockMesh = new Mesh(surfaceRockGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.9,
+      metalness: 0.01,
+      side: DoubleSide
+    }));
+    surfaceRockMesh.position.z = z + 0.06;
+    group.add(surfaceRockMesh);
     const crustShape = new Shape();
-    crustShape.moveTo(S.xMin, S.lithBottom);
+    crustShape.moveTo(S.xMin, S.surfaceRockTop);
     for (let i = 0; i <= segs; i++) {
       crustShape.lineTo(profilePoints[i].x, profilePoints[i].y);
     }
-    crustShape.lineTo(S.xMax, S.lithBottom);
+    crustShape.lineTo(S.xMax, S.surfaceRockTop);
     crustShape.closePath();
     const crustGeo = new ShapeGeometry(crustShape, 300);
     crustGeo.computeVertexNormals();
@@ -44070,17 +43510,14 @@ void main() {
       const westShore2 = indiaWestCoast(z);
       const eastShore2 = indiaEastCoast(z);
       const bayEnd2 = eastShore2 + 5;
-      if (x < westShore2) {
-        return oceanCrustColorAt(x, y);
-      } else if (x < eastShore2) {
-        return continentCrustColorAt(x, y);
-      } else if (x < bayEnd2) {
+      if (x < westShore2) return oceanCrustColorAt(x, y);
+      else if (x < eastShore2) return continentCrustColorAt(x, y);
+      else if (x < bayEnd2) {
         const subductT = clamp2((y - S.lithBottom) / (-S.lithBottom + S.seaLevel), 0, 1);
-        const glow = smoothstep2(S.seaLevel - 4, S.seaLevel + 1, y) * 0.12;
         return new Color(
-          mix(0.48, 0.72, subductT) + glow,
-          mix(0.14, 0.32, subductT) + glow * 0.3,
-          mix(0.1, 0.22, subductT) + glow * 0.2
+          mix(0.48, 0.72, subductT),
+          mix(0.14, 0.32, subductT),
+          mix(0.1, 0.22, subductT)
         );
       } else {
         return continentCrustColorAt(x, y);
@@ -44091,10 +43528,10 @@ void main() {
       roughness: 0.88,
       metalness: 0.03,
       emissive: new Color(1773572),
-      emissiveIntensity: 0.18,
+      emissiveIntensity: 0.12,
       side: DoubleSide
     }));
-    crustMesh.position.z = z + 0.02;
+    crustMesh.position.z = z + 0.07;
     group.add(crustMesh);
     const westShore = indiaWestCoast(z);
     const eastShore = indiaEastCoast(z);
@@ -44124,7 +43561,7 @@ void main() {
       emissiveIntensity: 0.55,
       side: DoubleSide
     }));
-    oceanWaterMesh.position.z = z + 0.05;
+    oceanWaterMesh.position.z = z + 0.09;
     oceanWaterMesh.renderOrder = 5;
     group.add(oceanWaterMesh);
     const bayWaterShape = new Shape();
@@ -44145,125 +43582,248 @@ void main() {
     const bayWaterMesh = new Mesh(bayWaterGeo, new MeshStandardMaterial({
       vertexColors: true,
       transparent: true,
-      opacity: 0.8,
-      roughness: 0.62,
+      opacity: 0.65,
+      roughness: 0.65,
       metalness: 0.02,
-      emissive: new Color(802150),
-      emissiveIntensity: 0.6,
+      emissive: new Color(399914),
+      emissiveIntensity: 0.25,
       side: DoubleSide
     }));
-    bayWaterMesh.position.z = z + 0.06;
+    bayWaterMesh.position.z = z + 0.1;
     bayWaterMesh.renderOrder = 6;
     group.add(bayWaterMesh);
-    const subductPoints2D = [
-      new Vector2(eastShore + 2.5, bayBedHeight(eastShore + 2.5, z)),
-      new Vector2(eastShore + 8, -5),
-      new Vector2(eastShore + 16, -12),
-      new Vector2(eastShore + 28, -20),
-      new Vector2(eastShore + 44, -30)
-    ];
-    const subductShape2D = new Shape();
-    const halfW = 1.8;
-    for (let i = 0; i < subductPoints2D.length; i++) {
-      subductShape2D.lineTo(subductPoints2D[i].x, subductPoints2D[i].y + halfW);
-    }
-    for (let i = subductPoints2D.length - 1; i >= 0; i--) {
-      subductShape2D.lineTo(subductPoints2D[i].x, subductPoints2D[i].y - halfW);
-    }
-    subductShape2D.closePath();
-    const subductGeo2D = new ShapeGeometry(subductShape2D, 40);
-    subductGeo2D.computeVertexNormals();
-    assignVertexColors(subductGeo2D, (x, y) => {
-      const t = clamp2((y + 32) / 40, 0, 1);
-      return new Color(
-        mix(0.8, 0.55, t),
-        mix(0.25, 0.15, t),
-        mix(0.12, 0.08, t)
-      );
-    });
-    const subductMesh2D = new Mesh(subductGeo2D, new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.65,
-      metalness: 0.06,
-      emissive: new Color(7281152),
-      emissiveIntensity: 0.85,
-      side: DoubleSide
-    }));
-    subductMesh2D.position.z = z + 0.07;
-    group.add(subductMesh2D);
     const seaLineGeo = new BufferGeometry().setFromPoints([
-      new Vector3(S.xMin, S.seaLevel, z + 0.08),
-      new Vector3(westShore + 0.5, S.seaLevel, z + 0.08)
+      new Vector3(S.xMin, S.seaLevel, z + 0.11),
+      new Vector3(westShore + 0.5, S.seaLevel, z + 0.11)
     ]);
-    const seaLineMat = new LineBasicMaterial({
+    group.add(new Line(seaLineGeo, new LineBasicMaterial({
       color: 8247551,
       transparent: true,
       opacity: 0.55,
       blending: AdditiveBlending,
       depthWrite: false
-    });
-    group.add(new Line(seaLineGeo, seaLineMat));
-    const lithLineGeo = new BufferGeometry().setFromPoints([
-      new Vector3(S.xMin, S.lithBottom, z + 0.09),
-      new Vector3(S.xMax, S.lithBottom, z + 0.09)
-    ]);
-    const lithLineMat = new LineBasicMaterial({
-      color: 16746564,
+    })));
+    const layerLineColor = 11184810;
+    const layerLineOpacity = 0.3;
+    const layerLineMat = new LineBasicMaterial({
+      color: layerLineColor,
       transparent: true,
-      opacity: 0.35,
-      blending: AdditiveBlending,
+      opacity: layerLineOpacity,
       depthWrite: false
     });
-    group.add(new Line(lithLineGeo, lithLineMat));
+    const capBottomLinePoints = [];
+    for (let i = 0; i <= 120; i++) {
+      const t = i / 120;
+      const x = mix(S.xMin, S.xMax, t);
+      capBottomLinePoints.push(new Vector3(x, reservoirTopAt(x, z), z + 0.12));
+    }
+    group.add(new Line(
+      new BufferGeometry().setFromPoints(capBottomLinePoints),
+      layerLineMat.clone()
+    ));
+    const resBottomLinePoints = [];
+    for (let i = 0; i <= 120; i++) {
+      const t = i / 120;
+      const x = mix(S.xMin, S.xMax, t);
+      resBottomLinePoints.push(new Vector3(x, reservoirBottomAt(x, z), z + 0.12));
+    }
+    group.add(new Line(
+      new BufferGeometry().setFromPoints(resBottomLinePoints),
+      layerLineMat.clone()
+    ));
+    const wpBottomLineGeo = new BufferGeometry().setFromPoints([
+      new Vector3(S.xMin, S.waterproofBottom, z + 0.12),
+      new Vector3(S.xMax, S.waterproofBottom, z + 0.12)
+    ]);
+    group.add(new Line(wpBottomLineGeo, layerLineMat.clone()));
+    const capTopLineGeo = new BufferGeometry().setFromPoints([
+      new Vector3(S.xMin, S.capRockTop, z + 0.12),
+      new Vector3(S.xMax, S.capRockTop, z + 0.12)
+    ]);
+    group.add(new Line(capTopLineGeo, layerLineMat.clone()));
+    const surfTopLineGeo = new BufferGeometry().setFromPoints([
+      new Vector3(S.xMin, S.surfaceRockTop, z + 0.12),
+      new Vector3(S.xMax, S.surfaceRockTop, z + 0.12)
+    ]);
+    group.add(new Line(surfTopLineGeo, layerLineMat.clone()));
     return group;
   }
-  function buildSubductionSlab(depth) {
-    const centerline = [
-      new Vector2(5, -1),
-      new Vector2(14, -6),
-      new Vector2(26, -14),
-      new Vector2(42, -24),
-      new Vector2(60, -34),
-      new Vector2(80, -43)
-    ];
-    const thickness = 4.5;
-    const upper = [], lower = [];
-    for (let i = 0; i < centerline.length; i++) {
-      const prev = centerline[Math.max(0, i - 1)];
-      const next = centerline[Math.min(centerline.length - 1, i + 1)];
-      const tangent = next.clone().sub(prev).normalize();
-      const normal = new Vector2(-tangent.y, tangent.x).multiplyScalar(thickness);
-      upper.push(centerline[i].clone().add(normal));
-      lower.push(centerline[i].clone().sub(normal));
-    }
-    const shape = new Shape();
-    shape.moveTo(upper[0].x, upper[0].y);
-    for (let i = 1; i < upper.length; i++) shape.lineTo(upper[i].x, upper[i].y);
-    for (let i = lower.length - 1; i >= 0; i--) shape.lineTo(lower[i].x, lower[i].y);
-    shape.closePath();
-    const geometry = new ExtrudeGeometry(shape, { depth, bevelEnabled: false, steps: 1, curveSegments: 56 });
-    geometry.computeVertexNormals();
-    assignVertexColors(geometry, (x, y) => {
-      const t = clamp2((y + 45) / 45, 0, 1);
-      const glow = smoothstep2(-5, 8, x) * 0.08;
-      return new Color(
-        mix(0.56, 0.84, t) + glow,
-        mix(0.18, 0.34, t) + glow * 0.24,
-        mix(0.22, 0.44, t) + glow * 0.16
-      );
-    });
-    const material = new MeshStandardMaterial({
+  function createBackProfilePanel() {
+    const group = new Group();
+    group.name = "BackProfile";
+    const z = S.backZ;
+    const segs = 160;
+    const basementShape = new Shape();
+    basementShape.moveTo(S.xMin, S.basementBottom);
+    basementShape.lineTo(S.xMax, S.basementBottom);
+    basementShape.lineTo(S.xMax, S.basementTop);
+    basementShape.lineTo(S.xMin, S.basementTop);
+    basementShape.closePath();
+    const basementGeo = new ShapeGeometry(basementShape, 40);
+    basementGeo.computeVertexNormals();
+    assignVertexColors(basementGeo, (x, y) => basementRockColor(x, y, z));
+    const basementMesh = new Mesh(basementGeo, new MeshStandardMaterial({
       vertexColors: true,
-      roughness: 0.72,
+      roughness: 0.92,
       metalness: 0.04,
-      emissive: new Color(3479583),
-      emissiveIntensity: 0.38
-    });
-    const mesh = new Mesh(geometry, material);
-    mesh.position.z = -depth * 0.5;
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+      side: DoubleSide
+    }));
+    basementMesh.position.z = z - 0.01;
+    group.add(basementMesh);
+    const wpTopProfile = [];
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const x = mix(S.xMin, S.xMax, t);
+      wpTopProfile.push(new Vector2(x, waterproofTopAt(x, z)));
+    }
+    const waterproofShape = new Shape();
+    waterproofShape.moveTo(S.xMin, S.waterproofBottom);
+    waterproofShape.lineTo(S.xMax, S.waterproofBottom);
+    for (let i = segs; i >= 0; i--) waterproofShape.lineTo(wpTopProfile[i].x, wpTopProfile[i].y);
+    waterproofShape.closePath();
+    const waterproofGeo = new ShapeGeometry(waterproofShape, 80);
+    waterproofGeo.computeVertexNormals();
+    assignVertexColors(waterproofGeo, (x, y) => waterproofLayerColor(x, y, z));
+    const waterproofMesh = new Mesh(waterproofGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.9,
+      metalness: 0.02,
+      side: DoubleSide
+    }));
+    waterproofMesh.position.z = z - 0.02;
+    group.add(waterproofMesh);
+    const resBottomPts = [], waterOilPts = [], oilGasPts = [], resTopPts = [];
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const x = mix(S.xMin, S.xMax, t);
+      resBottomPts.push(new Vector2(x, reservoirBottomAt(x, z)));
+      waterOilPts.push(new Vector2(x, waterOilBoundAt(x, z)));
+      oilGasPts.push(new Vector2(x, oilGasBoundAt(x, z)));
+      resTopPts.push(new Vector2(x, reservoirTopAt(x, z)));
+    }
+    const wShape = new Shape();
+    wShape.moveTo(resBottomPts[0].x, resBottomPts[0].y);
+    for (let i = 1; i <= segs; i++) wShape.lineTo(resBottomPts[i].x, resBottomPts[i].y);
+    for (let i = segs; i >= 0; i--) wShape.lineTo(waterOilPts[i].x, waterOilPts[i].y);
+    wShape.closePath();
+    const wGeo = new ShapeGeometry(wShape, 80);
+    wGeo.computeVertexNormals();
+    assignVertexColors(wGeo, (x, y) => waterZoneColor(x, y, z));
+    const wMesh = new Mesh(wGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.55,
+      metalness: 0.04,
+      emissive: new Color(2602),
+      emissiveIntensity: 0.45,
+      side: DoubleSide
+    }));
+    wMesh.position.z = z - 0.03;
+    group.add(wMesh);
+    const oShape = new Shape();
+    oShape.moveTo(waterOilPts[0].x, waterOilPts[0].y);
+    for (let i = 1; i <= segs; i++) oShape.lineTo(waterOilPts[i].x, waterOilPts[i].y);
+    for (let i = segs; i >= 0; i--) oShape.lineTo(oilGasPts[i].x, oilGasPts[i].y);
+    oShape.closePath();
+    const oGeo = new ShapeGeometry(oShape, 80);
+    oGeo.computeVertexNormals();
+    assignVertexColors(oGeo, (x, y) => oilZoneColor(x, y, z));
+    const oMesh = new Mesh(oGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.3,
+      metalness: 0.06,
+      emissive: new Color(0),
+      emissiveIntensity: 0,
+      side: DoubleSide
+    }));
+    oMesh.position.z = z - 0.035;
+    group.add(oMesh);
+    const gShape = new Shape();
+    gShape.moveTo(oilGasPts[0].x, oilGasPts[0].y);
+    for (let i = 1; i <= segs; i++) gShape.lineTo(oilGasPts[i].x, oilGasPts[i].y);
+    for (let i = segs; i >= 0; i--) gShape.lineTo(resTopPts[i].x, resTopPts[i].y);
+    gShape.closePath();
+    const gGeo = new ShapeGeometry(gShape, 80);
+    gGeo.computeVertexNormals();
+    assignVertexColors(gGeo, (x, y) => gasZoneColor(x, y, z));
+    const gMesh = new Mesh(gGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.45,
+      metalness: 0.02,
+      transparent: true,
+      opacity: 0.88,
+      emissive: new Color(3158064),
+      emissiveIntensity: 0.15,
+      side: DoubleSide
+    }));
+    gMesh.position.z = z - 0.04;
+    group.add(gMesh);
+    const capBottomPts = [];
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const x = mix(S.xMin, S.xMax, t);
+      capBottomPts.push(new Vector2(x, reservoirTopAt(x, z)));
+    }
+    const cShape = new Shape();
+    cShape.moveTo(S.xMin, S.capRockTop);
+    cShape.lineTo(S.xMax, S.capRockTop);
+    for (let i = segs; i >= 0; i--) cShape.lineTo(capBottomPts[i].x, capBottomPts[i].y);
+    cShape.closePath();
+    const cGeo = new ShapeGeometry(cShape, 80);
+    cGeo.computeVertexNormals();
+    assignVertexColors(cGeo, (x, y) => capRockColor(x, y, z));
+    const cMesh = new Mesh(cGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.88,
+      metalness: 0.02,
+      side: DoubleSide
+    }));
+    cMesh.position.z = z - 0.05;
+    group.add(cMesh);
+    const sShape = new Shape();
+    sShape.moveTo(S.xMin, S.lithBottom);
+    sShape.lineTo(S.xMax, S.lithBottom);
+    sShape.lineTo(S.xMax, S.surfaceRockTop);
+    sShape.lineTo(S.xMin, S.surfaceRockTop);
+    sShape.closePath();
+    const sGeo = new ShapeGeometry(sShape, 40);
+    sGeo.computeVertexNormals();
+    assignVertexColors(sGeo, (x, y) => surfaceRockColor(x, y, z));
+    const sMesh = new Mesh(sGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.9,
+      metalness: 0.01,
+      side: DoubleSide
+    }));
+    sMesh.position.z = z - 0.06;
+    group.add(sMesh);
+    const profilePts = [];
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const x = mix(S.xMin, S.xMax, t);
+      profilePts.push(new Vector2(x, terrainHeightAt(x, z)));
+    }
+    const crShape = new Shape();
+    crShape.moveTo(S.xMin, S.surfaceRockTop);
+    for (const p of profilePts) crShape.lineTo(p.x, p.y);
+    crShape.lineTo(S.xMax, S.surfaceRockTop);
+    crShape.closePath();
+    const crGeo = new ShapeGeometry(crShape, 160);
+    crGeo.computeVertexNormals();
+    assignVertexColors(crGeo, (x, y) => continentCrustColorAt(x, y));
+    const crMesh = new Mesh(crGeo, new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.88,
+      metalness: 0.02,
+      side: DoubleSide
+    }));
+    crMesh.position.z = z - 0.07;
+    group.add(crMesh);
+    return group;
+  }
+  function createSubsurfaceLayers(textures) {
+    const group = new Group();
+    group.name = "SubsurfaceLayers";
+    return group;
   }
   function configureTexture(texture, repeatX, repeatY) {
     if (!texture) return null;
@@ -44373,57 +43933,403 @@ void main() {
     mesh.receiveShadow = true;
     return mesh;
   }
-  function createRockSideWall(xPosition, topHeight, textures, tint) {
-    const geometry = new PlaneGeometry(S.depth, Math.max(topHeight - S.lithBottom, 2));
-    const material = new MeshStandardMaterial({
-      color: tint,
+  function createLayeredSideWall(xPosition, textures) {
+    const group = new Group();
+    group.name = `SideWall_${xPosition > 0 ? "Right" : "Left"}`;
+    const segs = 160;
+    const ySegs = 12;
+    function addLayer(yBot, yTop, colorFn, matOpts = {}) {
+      const geo = new PlaneGeometry(S.depth, yTop - yBot, segs, ySegs);
+      const pos = geo.getAttribute("position");
+      const colors = new Float32Array(pos.count * 3);
+      for (let i = 0; i < pos.count; i++) {
+        const zScene = pos.getX(i);
+        const yScene = pos.getY(i) + (yBot + yTop) * 0.5;
+        const c = colorFn(xPosition, yScene, zScene);
+        colors[i * 3] = c.r;
+        colors[i * 3 + 1] = c.g;
+        colors[i * 3 + 2] = c.b;
+      }
+      geo.setAttribute("color", new BufferAttribute(colors, 3));
+      geo.computeVertexNormals();
+      const mat = new MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0.02,
+        side: DoubleSide,
+        ...matOpts
+      });
+      const mesh = new Mesh(geo, mat);
+      mesh.rotation.y = Math.PI * 0.5;
+      mesh.position.set(xPosition, (yBot + yTop) * 0.5, 0);
+      group.add(mesh);
+    }
+    addLayer(
+      S.basementBottom,
+      S.basementTop,
+      (x, y, z) => basementRockColor(x, y, z),
+      { roughness: 0.92, metalness: 0.04 }
+    );
+    addLayer(
+      S.waterproofBottom,
+      S.waterproofTop,
+      (x, y, z) => waterproofLayerColor(x, y, z)
+    );
+    addLayer(
+      S.reservoirBottom,
+      S.reservoirTop,
+      (x, y, z) => {
+        const resBottom = reservoirBottomAt(x, z);
+        const resTop = reservoirTopAt(x, z);
+        const woBound = waterOilBoundAt(x, z);
+        const ogBound = oilGasBoundAt(x, z);
+        if (y <= woBound) return waterZoneColor(x, y, z);
+        if (y <= ogBound) return oilZoneColor(x, y, z);
+        return gasZoneColor(x, y, z);
+      },
+      { emissive: new Color(394242), emissiveIntensity: 0.1 }
+    );
+    addLayer(
+      S.capRockBottom,
+      S.capRockTop,
+      (x, y, z) => capRockColor(x, y, z)
+    );
+    addLayer(
+      S.lithBottom,
+      S.surfaceRockTop,
+      (x, y, z) => surfaceRockColor(x, y, z)
+    );
+    const posArr = [], idxArr = [], uvArr = [], colArr = [];
+    for (let i = 0; i <= segs; i++) {
+      const t = i / segs;
+      const zv = mix(S.backZ, S.frontZ, t);
+      const topY = terrainHeightAt(xPosition, zv);
+      const botY = S.surfaceRockTop;
+      posArr.push(xPosition, topY, zv);
+      posArr.push(xPosition, botY, zv);
+      uvArr.push(t, 1);
+      uvArr.push(t, 0);
+      const cTop = continentCrustColorAt(xPosition, topY);
+      const cBot = continentCrustColorAt(xPosition, botY);
+      colArr.push(cTop.r, cTop.g, cTop.b);
+      colArr.push(cBot.r, cBot.g, cBot.b);
+    }
+    for (let i = 0; i < segs; i++) {
+      const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
+      idxArr.push(a, b, c, b, d, c);
+    }
+    const crustGeo = new BufferGeometry();
+    crustGeo.setAttribute("position", new Float32BufferAttribute(posArr, 3));
+    crustGeo.setAttribute("uv", new Float32BufferAttribute(uvArr, 2));
+    crustGeo.setAttribute("color", new Float32BufferAttribute(colArr, 3));
+    crustGeo.setIndex(idxArr);
+    crustGeo.computeVertexNormals();
+    const crustMat = new MeshStandardMaterial({
+      vertexColors: true,
+      roughness: 0.94,
+      metalness: 0.01,
       map: textures.rockColor,
       bumpMap: textures.rockBump,
       roughnessMap: textures.rockRoughness,
-      bumpScale: 0.45,
-      roughness: 1,
-      metalness: 0.01,
+      bumpScale: 0.35,
       side: DoubleSide
     });
-    const mesh = new Mesh(geometry, material);
-    mesh.rotation.y = Math.PI * 0.5;
-    mesh.position.set(xPosition, (topHeight + S.lithBottom) * 0.5, 0);
-    mesh.castShadow = true;
-    mesh.receiveShadow = true;
-    return mesh;
+    group.add(new Mesh(crustGeo, crustMat));
+    const isOceanSide = xPosition <= S.xMin + 1;
+    if (isOceanSide) {
+      const westShore = indiaWestCoast(0);
+      const wPosArr = [], wIdxArr = [], wColArr = [];
+      for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        const zv = mix(S.backZ, S.frontZ, t);
+        const ws = indiaWestCoast(zv);
+        if (xPosition > ws) continue;
+        const floorY = Math.min(oceanFloorHeight(xPosition, zv), S.seaLevel - 0.1);
+        wPosArr.push(xPosition, S.seaLevel, zv);
+        wPosArr.push(xPosition, floorY, zv);
+        const w = i;
+        wColArr.push(0.04, 0.22, 0.62);
+        wColArr.push(0.02, 0.12, 0.42);
+      }
+      if (wPosArr.length >= 12) {
+        const wCnt = wPosArr.length / 3;
+        for (let i = 0; i < wCnt / 2 - 1; i++) {
+          const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
+          wIdxArr.push(a, b, c, b, d, c);
+        }
+        const wGeo = new BufferGeometry();
+        wGeo.setAttribute("position", new Float32BufferAttribute(wPosArr, 3));
+        wGeo.setAttribute("color", new Float32BufferAttribute(wColArr, 3));
+        wGeo.setIndex(wIdxArr);
+        wGeo.computeVertexNormals();
+        const wMat = new MeshStandardMaterial({
+          vertexColors: true,
+          transparent: true,
+          opacity: 0.7,
+          emissive: new Color(806264),
+          emissiveIntensity: 0.45,
+          roughness: 0.65,
+          metalness: 0.02,
+          side: DoubleSide
+        });
+        group.add(new Mesh(wGeo, wMat));
+      }
+    }
+    return group;
   }
-  function createWaterSideWall(xPosition, floorHeight) {
-    const geometry = new PlaneGeometry(S.depth, Math.max(S.seaLevel - floorHeight, 2));
-    const material = new MeshStandardMaterial({
-      color: 1074592,
+  function createOilWellTower(scale = 1, isOffshore = false) {
+    const group = new Group();
+    const metalMat = new MeshStandardMaterial({
+      color: 4868682,
+      roughness: 0.6,
+      metalness: 0.8
+    });
+    const darkMetalMat = new MeshStandardMaterial({
+      color: 2763306,
+      roughness: 0.5,
+      metalness: 0.9
+    });
+    const platformMat = new MeshStandardMaterial({
+      color: 5592405,
+      roughness: 0.7,
+      metalness: 0.6
+    });
+    const towerH = 10 * scale;
+    const towerBase = 4 * scale;
+    const towerTop = 1.2 * scale;
+    const legPositions = [
+      [-towerBase * 0.5, towerBase * 0.5],
+      [towerBase * 0.5, towerBase * 0.5],
+      [towerBase * 0.5, -towerBase * 0.5],
+      [-towerBase * 0.5, -towerBase * 0.5]
+    ];
+    const legTopPositions = [
+      [-towerTop * 0.5, towerTop * 0.5],
+      [towerTop * 0.5, towerTop * 0.5],
+      [towerTop * 0.5, -towerTop * 0.5],
+      [-towerTop * 0.5, -towerTop * 0.5]
+    ];
+    for (let i = 0; i < 4; i++) {
+      const [bx, bz] = legPositions[i];
+      const [tx, tz] = legTopPositions[i];
+      const startVec = new Vector3(bx, 0, bz);
+      const endVec = new Vector3(tx, towerH, tz);
+      const midPoint = startVec.clone().add(endVec).multiplyScalar(0.5);
+      const legDir = endVec.clone().sub(startVec);
+      const legLen = legDir.length();
+      const legGeo = new CylinderGeometry(0.1 * scale, 0.12 * scale, legLen, 5);
+      const legMesh = new Mesh(legGeo, metalMat.clone());
+      legMesh.position.copy(midPoint);
+      const axis = new Vector3(0, 1, 0);
+      legMesh.quaternion.setFromUnitVectors(axis, legDir.clone().normalize());
+      group.add(legMesh);
+    }
+    const braceHeights = [towerH * 0.3, towerH * 0.6];
+    for (const bh of braceHeights) {
+      const t = bh / towerH;
+      const bw = mix(towerBase, towerTop, t);
+      for (const z of [-bw * 0.5, bw * 0.5]) {
+        const braceGeo = new CylinderGeometry(0.06 * scale, 0.06 * scale, bw, 4);
+        const braceMesh = new Mesh(braceGeo, darkMetalMat.clone());
+        braceMesh.rotation.z = Math.PI * 0.5;
+        braceMesh.position.set(0, bh, z);
+        group.add(braceMesh);
+      }
+      for (const x of [-bw * 0.5, bw * 0.5]) {
+        const braceGeo = new CylinderGeometry(0.06 * scale, 0.06 * scale, bw, 4);
+        const braceMesh = new Mesh(braceGeo, darkMetalMat.clone());
+        braceMesh.rotation.x = Math.PI * 0.5;
+        braceMesh.position.set(x, bh, 0);
+        group.add(braceMesh);
+      }
+    }
+    const xBraceSections = [[0, towerH * 0.3], [towerH * 0.3, towerH * 0.6], [towerH * 0.6, towerH]];
+    for (const [y0, y1] of xBraceSections) {
+      const t0 = y0 / towerH, t1 = y1 / towerH;
+      const w0 = mix(towerBase, towerTop, t0);
+      const w1 = mix(towerBase, towerTop, t1);
+      for (const zSign of [-1, 1]) {
+        const p1 = new Vector3(-w0 * 0.5, y0, zSign * w0 * 0.5);
+        const p2 = new Vector3(w1 * 0.5, y1, zSign * w1 * 0.5);
+        const mid = p1.clone().add(p2).multiplyScalar(0.5);
+        const dir = p2.clone().sub(p1);
+        const len = dir.length();
+        const dGeo = new CylinderGeometry(0.05 * scale, 0.05 * scale, len, 4);
+        const dMesh = new Mesh(dGeo, darkMetalMat.clone());
+        dMesh.position.copy(mid);
+        dMesh.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), dir.clone().normalize());
+        group.add(dMesh);
+        const q1 = new Vector3(w0 * 0.5, y0, zSign * w0 * 0.5);
+        const q2 = new Vector3(-w1 * 0.5, y1, zSign * w1 * 0.5);
+        const midQ = q1.clone().add(q2).multiplyScalar(0.5);
+        const dirQ = q2.clone().sub(q1);
+        const lenQ = dirQ.length();
+        const dGeoQ = new CylinderGeometry(0.05 * scale, 0.05 * scale, lenQ, 4);
+        const dMeshQ = new Mesh(dGeoQ, darkMetalMat.clone());
+        dMeshQ.position.copy(midQ);
+        dMeshQ.quaternion.setFromUnitVectors(new Vector3(0, 1, 0), dirQ.clone().normalize());
+        group.add(dMeshQ);
+      }
+    }
+    const platW = towerTop * 2.2;
+    const platH = 0.3 * scale;
+    const platGeo = new BoxGeometry(platW, platH, platW);
+    const platMesh = new Mesh(platGeo, platformMat.clone());
+    platMesh.position.set(0, towerH + platH * 0.5, 0);
+    group.add(platMesh);
+    const topCapGeo = new ConeGeometry(0.4 * scale, 1.5 * scale, 4);
+    const topCapMesh = new Mesh(topCapGeo, metalMat.clone());
+    topCapMesh.position.set(0, towerH + platH + 0.75 * scale, 0);
+    group.add(topCapMesh);
+    return group;
+  }
+  function createLandOilWell(x, z, surfaceY, oilLayerY) {
+    const group = new Group();
+    group.name = "LandOilWell";
+    const scale = 0.9;
+    const tower = createOilWellTower(scale, false);
+    tower.position.set(x, surfaceY, z);
+    group.add(tower);
+    const towerH = 10 * scale;
+    const platH = 0.3 * scale;
+    const pipeTopY = surfaceY + towerH + platH;
+    const pipeLen = pipeTopY - oilLayerY;
+    const pipeGeo = new CylinderGeometry(0.15 * scale, 0.15 * scale, pipeLen, 8);
+    const pipeMat = new MeshStandardMaterial({
+      color: 3355443,
+      roughness: 0.4,
+      metalness: 0.95
+    });
+    const pipeMesh = new Mesh(pipeGeo, pipeMat);
+    pipeMesh.position.set(x, pipeTopY - pipeLen * 0.5, z);
+    group.add(pipeMesh);
+    const pipeTipGeo = new CylinderGeometry(0.2 * scale, 0.1 * scale, 1, 8);
+    const pipeTipMat = new MeshStandardMaterial({
+      color: 1706496,
+      roughness: 0.3,
+      metalness: 0.8,
+      emissive: new Color(3809280),
+      emissiveIntensity: 0.8
+    });
+    const pipeTipMesh = new Mesh(pipeTipGeo, pipeTipMat);
+    pipeTipMesh.position.set(x, oilLayerY + 0.5, z);
+    group.add(pipeTipMesh);
+    return group;
+  }
+  function createOffshoreOilPlatform(x, z, seaLevel, seabedY, oilLayerY) {
+    const group = new Group();
+    group.name = "OffshoreOilPlatform";
+    const scale = 1.1;
+    const platformY = seaLevel + 3.5 * scale;
+    const platW = 8 * scale;
+    const platD = 8 * scale;
+    const platH = 0.6 * scale;
+    const platMat = new MeshStandardMaterial({
+      color: 6710886,
+      roughness: 0.8,
+      metalness: 0.5
+    });
+    const platGeo = new BoxGeometry(platW, platH, platD);
+    const platMesh = new Mesh(platGeo, platMat);
+    platMesh.position.set(x, platformY, z);
+    platMesh.castShadow = true;
+    platMesh.receiveShadow = true;
+    group.add(platMesh);
+    const legOffsets = [
+      [-platW * 0.35, -platD * 0.35],
+      [platW * 0.35, -platD * 0.35],
+      [platW * 0.35, platD * 0.35],
+      [-platW * 0.35, platD * 0.35]
+    ];
+    const legLen = platformY - platH * 0.5 - seabedY;
+    const legMat = new MeshStandardMaterial({
+      color: 4868682,
+      roughness: 0.6,
+      metalness: 0.8
+    });
+    for (const [ox, oz] of legOffsets) {
+      const legGeo = new CylinderGeometry(0.35 * scale, 0.4 * scale, legLen, 8);
+      const legMesh = new Mesh(legGeo, legMat.clone());
+      legMesh.position.set(x + ox, seabedY + legLen * 0.5, z + oz);
+      legMesh.castShadow = true;
+      group.add(legMesh);
+      const ringY = seaLevel - 1.5;
+      const ringGeo = new TorusGeometry(0.45 * scale, 0.07 * scale, 6, 12);
+      const ringMat = new MeshStandardMaterial({ color: 5592405, roughness: 0.7, metalness: 0.7 });
+      const ringMesh = new Mesh(ringGeo, ringMat);
+      ringMesh.rotation.x = Math.PI * 0.5;
+      ringMesh.position.set(x + ox, ringY, z + oz);
+      group.add(ringMesh);
+    }
+    const braceY1 = seaLevel - 4;
+    const braceY2 = seaLevel - 8;
+    const bw = platW * 0.7;
+    const darkLegMat = new MeshStandardMaterial({ color: 3355443, roughness: 0.7, metalness: 0.7 });
+    for (const [y, xOff, zOff] of [[braceY1, 0, 0], [braceY2, 0, 0]]) {
+      for (const zs of [-bw * 0.5, bw * 0.5]) {
+        const bGeo = new CylinderGeometry(0.12 * scale, 0.12 * scale, bw, 6);
+        const bMesh = new Mesh(bGeo, darkLegMat.clone());
+        bMesh.rotation.z = Math.PI * 0.5;
+        bMesh.position.set(x, y, z + zs);
+        group.add(bMesh);
+      }
+      for (const xs of [-bw * 0.5, bw * 0.5]) {
+        const bGeo = new CylinderGeometry(0.12 * scale, 0.12 * scale, bw, 6);
+        const bMesh = new Mesh(bGeo, darkLegMat.clone());
+        bMesh.rotation.x = Math.PI * 0.5;
+        bMesh.position.set(x + xs, y, z);
+        group.add(bMesh);
+      }
+    }
+    const tower = createOilWellTower(scale * 0.85, true);
+    tower.position.set(x, platformY + platH * 0.5, z);
+    group.add(tower);
+    const towerScaleOff = scale * 0.85;
+    const towerHOff = 10 * towerScaleOff;
+    const towerPlatHOff = 0.3 * towerScaleOff;
+    const towerBaseY = platformY + platH * 0.5;
+    const pipeTopY = towerBaseY + towerHOff + towerPlatHOff;
+    const pipeMat = new MeshStandardMaterial({
+      color: 2763306,
+      roughness: 0.4,
+      metalness: 0.95
+    });
+    const aboveWaterLen = pipeTopY - seaLevel;
+    const pipeAboveGeo = new CylinderGeometry(0.18 * scale, 0.18 * scale, aboveWaterLen, 8);
+    const pipeAboveMesh = new Mesh(pipeAboveGeo, pipeMat.clone());
+    pipeAboveMesh.position.set(x, seaLevel + aboveWaterLen * 0.5, z);
+    group.add(pipeAboveMesh);
+    const underwaterLen = seaLevel - seabedY;
+    const pipeUnderGeo = new CylinderGeometry(0.18 * scale, 0.18 * scale, underwaterLen, 8);
+    const pipeUnderMat = new MeshStandardMaterial({
+      color: 2763306,
+      roughness: 0.4,
+      metalness: 0.95,
       transparent: true,
-      opacity: 0.72,
-      emissive: new Color(806264),
-      emissiveIntensity: 0.45,
-      roughness: 0.65,
-      metalness: 0.02,
-      side: DoubleSide
+      opacity: 0.85
     });
-    const mesh = new Mesh(geometry, material);
-    mesh.rotation.y = Math.PI * 0.5;
-    mesh.position.set(xPosition, (S.seaLevel + floorHeight) * 0.5, 0);
-    mesh.receiveShadow = true;
-    return mesh;
-  }
-  function createMantleSideWall(xPosition) {
-    const geometry = new PlaneGeometry(S.depth, S.mantleTop - S.mantleBottom);
-    const material = new MeshStandardMaterial({
-      color: 5771779,
-      emissive: new Color(16734747),
-      emissiveIntensity: 1.15,
-      roughness: 0.84,
-      side: DoubleSide
+    const pipeUnderMesh = new Mesh(pipeUnderGeo, pipeUnderMat);
+    pipeUnderMesh.position.set(x, seabedY + underwaterLen * 0.5, z);
+    group.add(pipeUnderMesh);
+    const deepLen = seabedY - oilLayerY;
+    if (deepLen > 0.5) {
+      const pipeDeepGeo = new CylinderGeometry(0.15 * scale, 0.15 * scale, deepLen, 8);
+      const pipeDeepMesh = new Mesh(pipeDeepGeo, pipeMat.clone());
+      pipeDeepMesh.position.set(x, oilLayerY + deepLen * 0.5, z);
+      group.add(pipeDeepMesh);
+    }
+    const pipeTipGeo = new CylinderGeometry(0.22 * scale, 0.12 * scale, 1.2, 8);
+    const pipeTipMat = new MeshStandardMaterial({
+      color: 1706496,
+      roughness: 0.3,
+      metalness: 0.8,
+      emissive: new Color(3809280),
+      emissiveIntensity: 0.8
     });
-    const mesh = new Mesh(geometry, material);
-    mesh.rotation.y = Math.PI * 0.5;
-    mesh.position.set(xPosition, (S.mantleTop + S.mantleBottom) * 0.5, 0);
-    mesh.receiveShadow = true;
-    return mesh;
+    const pipeTipMesh = new Mesh(pipeTipGeo, pipeTipMat);
+    pipeTipMesh.position.set(x, oilLayerY + 0.6, z);
+    group.add(pipeTipMesh);
+    return group;
   }
   function createTectonicLandscape(scene, deps = {}) {
     const root = new Group();
@@ -44433,79 +44339,12 @@ void main() {
     const westShore0 = indiaWestCoast(0);
     const eastShore0 = indiaEastCoast(0);
     const bayEnd0 = eastShore0 + 5;
-    const mantleFront = createSolidSection(
-      [new Vector2(S.xMin, S.mantleTop), new Vector2(S.xMax, S.mantleTop)],
-      S.mantleBottom,
-      mantleColorAt,
-      { roughness: 0.7, metalness: 0.02, emissive: new Color(6036996), emissiveIntensity: 1.6 }
-    );
-    mantleFront.position.z = S.frontZ;
-    root.add(mantleFront);
-    const mantleBack = mantleFront.clone();
-    mantleBack.position.z = S.backZ;
-    root.add(mantleBack);
-    const mantleTopGeometry = new PlaneGeometry(S.xMax - S.xMin, S.depth, 56, 28);
-    const mantleTopPositions = mantleTopGeometry.getAttribute("position");
-    const mantleTopColors = new Float32Array(mantleTopPositions.count * 3);
-    for (let i = 0; i < mantleTopPositions.count; i++) {
-      const u = (mantleTopPositions.getX(i) + (S.xMax - S.xMin) * 0.5) / (S.xMax - S.xMin);
-      const v = (mantleTopPositions.getY(i) + S.depth * 0.5) / S.depth;
-      const heat = gaussian(u, 0.48, 0.34) * gaussian(v, 0.5, 0.42) * 0.68 + 0.24;
-      mantleTopColors[i * 3] = mix(0.3, 0.92, heat);
-      mantleTopColors[i * 3 + 1] = mix(0.05, 0.34, heat * heat);
-      mantleTopColors[i * 3 + 2] = mix(0.02, 0.08, heat * 0.3);
-    }
-    mantleTopGeometry.setAttribute("color", new BufferAttribute(mantleTopColors, 3));
-    const mantleTopMesh = new Mesh(mantleTopGeometry, new MeshStandardMaterial({
-      vertexColors: true,
-      emissive: new Color(16734747),
-      emissiveIntensity: 1,
-      roughness: 0.82,
-      metalness: 0,
-      side: DoubleSide
-    }));
-    mantleTopMesh.rotation.x = -Math.PI * 0.5;
-    mantleTopMesh.position.set((S.xMin + S.xMax) * 0.5, S.mantleTop + 0.1, 0);
-    mantleTopMesh.receiveShadow = true;
-    root.add(mantleTopMesh);
-    const mantleGlow = createGlowStrip(S.xMax - S.xMin - 8, 16, 16742975, 0.32);
-    mantleGlow.rotation.x = -Math.PI * 0.5;
-    mantleGlow.position.set((S.xMin + S.xMax) * 0.5, S.mantleTop + 0.55, 0);
-    root.add(mantleGlow);
-    const mantleBottomPlane = new Mesh(
-      new PlaneGeometry(S.xMax - S.xMin, S.depth, 1, 1),
-      new MeshStandardMaterial({
-        color: 3804418,
-        emissive: new Color(16724736),
-        emissiveIntensity: 0.8,
-        roughness: 0.9
-      })
-    );
-    mantleBottomPlane.rotation.x = -Math.PI * 0.5;
-    mantleBottomPlane.position.set((S.xMin + S.xMax) * 0.5, S.mantleBottom, 0);
-    root.add(mantleBottomPlane);
-    const vortexGroup = new Group();
-    vortexGroup.position.z = S.frontZ + 0.2;
-    vortexGroup.add(createConvectionVortex(-55, -38, 30, 10, 16738816, 0.28));
-    vortexGroup.add(createConvectionVortex(50, -40, 28, 10, 16729344, 0.24));
-    vortexGroup.add(createConvectionVortex(8, -42, 18, 7, 16747520, 0.18));
-    root.add(vortexGroup);
-    const oceanProfileBack = sampleProfile(S.backZ, S.xMin, westShore0, 120, oceanFloorHeight);
-    const oceanCrustBack = createSolidSection(oceanProfileBack, S.lithBottom, oceanCrustColorAt, {
-      emissive: new Color(1707270),
-      emissiveIntensity: 0.3
-    });
-    oceanCrustBack.position.z = S.backZ - 0.04;
-    root.add(oceanCrustBack);
-    const fullProfileBack = sampleProfile(S.backZ, S.xMin, S.xMax, 300, terrainHeightAt);
-    const fullCrustBack = createSolidSection(fullProfileBack, S.lithBottom, continentCrustColorAt, {
-      emissive: new Color(1773572),
-      emissiveIntensity: 0.2
-    });
-    fullCrustBack.position.z = S.backZ - 0.02;
-    root.add(fullCrustBack);
+    const subsurfaceLayers = createSubsurfaceLayers(textures);
+    root.add(subsurfaceLayers);
     const frontPanel = createFrontProfilePanel(textures);
     root.add(frontPanel);
+    const backPanel = createBackProfilePanel();
+    root.add(backPanel);
     const oceanFloorTop = createHeightField(
       S.xMin,
       S.indiaWestMeanX - 5,
@@ -44517,14 +44356,6 @@ void main() {
       { roughness: 0.98, metalness: 0.02, emissive: new Color(988966), emissiveIntensity: 0.16 }
     );
     root.add(oceanFloorTop);
-    const ridgeGlow = createGlowStrip(22, S.depth - 10, 7002367, 0.16);
-    ridgeGlow.rotation.x = -Math.PI * 0.5;
-    ridgeGlow.position.set(S.ridgeX, oceanFloorHeight(S.ridgeX, 0) + 0.25, 0);
-    root.add(ridgeGlow);
-    const trenchGlow = createGlowStrip(16, S.depth - 10, 9426687, 0.1);
-    trenchGlow.rotation.x = -Math.PI * 0.5;
-    trenchGlow.position.set(westShore0 - 6, oceanFloorHeight(westShore0 - 6, 0) + 0.22, 0);
-    root.add(trenchGlow);
     const waterBedProfileBack = sampleProfile(S.backZ, S.xMin, westShore0 + 0.8, 180, (x, z) => Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1));
     const waterTopProfileBack = waterBedProfileBack.map((p) => new Vector2(p.x, S.seaLevel));
     const waterBack = createFilledSection(waterTopProfileBack, waterBedProfileBack, waterColorAt, {
@@ -44544,8 +44375,8 @@ void main() {
     waterSurface.renderOrder = 6;
     root.add(waterSurface);
     const bayWater = createBayWaterSurface({
-      emissive: new Color(802150),
-      emissiveIntensity: 0.5,
+      emissive: new Color(399914),
+      emissiveIntensity: 0.2,
       normalMap: textures.waterNormalTex,
       normalScale: new Vector2(0.15, 0.15)
     });
@@ -44571,11 +44402,11 @@ void main() {
       const bayBackMesh = new Mesh(bayBackGeo, new MeshStandardMaterial({
         vertexColors: true,
         transparent: true,
-        opacity: 0.8,
-        roughness: 0.62,
+        opacity: 0.6,
+        roughness: 0.65,
         metalness: 0.02,
-        emissive: new Color(802150),
-        emissiveIntensity: 0.6,
+        emissive: new Color(399914),
+        emissiveIntensity: 0.25,
         side: DoubleSide
       }));
       bayBackMesh.position.z = zBack - 0.06;
@@ -44603,7 +44434,7 @@ void main() {
         const bayEnd = east + 5;
         if (x < west) return oceanTopColorAt(x, y, z);
         if (x >= bayEnd) return continentTopColorAt(x, y, z, slope);
-        if (x >= east) return bayWaterColorAt(x, y, z);
+        if (x >= east) return oceanTopColorAt(x, y, z);
         return indiaLandTopColorAt(x, y, z);
       },
       {
@@ -44621,26 +44452,17 @@ void main() {
     {
       const wallX = S.indiaEastMeanX + 30;
       const segZ = 80;
-      const zStart = S.backZ;
-      const zEnd = S.frontZ;
-      const posArr = [];
-      const idxArr = [];
-      const uvArr = [];
+      const posArr = [], idxArr = [], uvArr = [];
       for (let i = 0; i <= segZ; i++) {
         const t = i / segZ;
-        const zv = mix(zStart, zEnd, t);
+        const zv = mix(S.backZ, S.frontZ, t);
         const topY = terrainHeightAt(wallX, zv);
-        const botY = S.lithBottom;
-        posArr.push(wallX, topY, zv);
-        posArr.push(wallX, botY, zv);
-        uvArr.push(t, 1);
-        uvArr.push(t, 0);
+        const botY = S.basementBottom;
+        posArr.push(wallX, topY, zv, wallX, botY, zv);
+        uvArr.push(t, 1, t, 0);
       }
       for (let i = 0; i < segZ; i++) {
-        const a = i * 2;
-        const b = i * 2 + 1;
-        const c = (i + 1) * 2;
-        const d = (i + 1) * 2 + 1;
+        const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
         idxArr.push(a, b, c, b, d, c);
       }
       const wallGeo = new BufferGeometry();
@@ -44658,10 +44480,7 @@ void main() {
         metalness: 0.01,
         side: DoubleSide
       });
-      const wallMesh = new Mesh(wallGeo, wallMat);
-      wallMesh.castShadow = true;
-      wallMesh.receiveShadow = true;
-      root.add(wallMesh);
+      root.add(new Mesh(wallGeo, wallMat));
     }
     const landGroup = new Group();
     landGroup.name = "TectonicLandscapeLand";
@@ -44692,393 +44511,89 @@ void main() {
     landGroup.add(snowCaps);
     const shorelineFoam = createShorelineFoam();
     root.add(shorelineFoam);
-    const leftOceanHeight = oceanFloorHeight(S.xMin, 0);
-    root.add(createRockSideWall(S.xMin, leftOceanHeight, textures, 7169630));
-    root.add(createWaterSideWall(S.xMin, leftOceanHeight));
-    const rightContinentHeight = continentHeight(S.xMax, 0);
-    landGroup.add(createRockSideWall(S.xMax, rightContinentHeight, textures, 9143677));
-    root.add(createMantleSideWall(S.xMin));
-    root.add(createMantleSideWall(S.xMax));
-    const slabGroup = new Group();
-    const slabMesh = buildSubductionSlab(S.depth - 6);
-    slabGroup.add(slabMesh);
-    const slabGlow = createGlowStrip(80, 8, 16743722, 0.18);
-    slabGlow.rotation.set(0, 0, -0.42);
-    slabGlow.position.set(35, -22, S.frontZ - 0.6);
-    slabGroup.add(slabGlow);
-    root.add(slabGroup);
-    const magmaColumn = new Mesh(
-      new CylinderGeometry(4.5, 9, 20, 18, 1, true),
-      new MeshBasicMaterial({
-        color: 16742960,
-        transparent: true,
-        opacity: 0.34,
-        depthWrite: false,
-        blending: AdditiveBlending
-      })
-    );
-    magmaColumn.position.set(55, -5, 0);
-    root.add(magmaColumn);
-    const ridgeArrowsLeft = [];
-    [
-      { x: S.ridgeX - 15, y: S.seaLevel + 1, z: -22 },
-      { x: S.ridgeX - 18, y: S.seaLevel + 0.8, z: 5 },
-      { x: S.ridgeX - 13, y: S.seaLevel + 1.2, z: 26 }
-    ].forEach((cfg) => {
-      const arrow = createArrowGlyph(9494783, -1, 1.1);
-      arrow.position.set(cfg.x, cfg.y, cfg.z);
-      root.add(arrow);
-      ridgeArrowsLeft.push(arrow);
-    });
-    const ridgeArrowsRight = [];
-    [
-      { x: S.ridgeX + 15, y: S.seaLevel + 1, z: -18 },
-      { x: S.ridgeX + 18, y: S.seaLevel + 0.8, z: 8 },
-      { x: S.ridgeX + 13, y: S.seaLevel + 1.2, z: 28 }
-    ].forEach((cfg) => {
-      const arrow = createArrowGlyph(9494783, 1, 1.1);
-      arrow.position.set(cfg.x, cfg.y, cfg.z);
-      root.add(arrow);
-      ridgeArrowsRight.push(arrow);
-    });
-    const oceanArrows = [];
-    [
-      { x: -55, y: S.seaLevel + 0.8, z: -18 },
-      { x: -40, y: S.seaLevel + 0.6, z: 6 },
-      { x: -22, y: S.seaLevel + 0.9, z: 22 }
-    ].forEach((cfg) => {
-      const arrow = createArrowGlyph(6080767, 1, 1);
-      arrow.position.set(cfg.x, cfg.y, cfg.z);
-      root.add(arrow);
-      oceanArrows.push(arrow);
-    });
-    const landArrows = [];
-    [
-      { x: 40, z: -10 },
-      { x: 80, z: 14 }
-    ].forEach((cfg) => {
-      const arrow = createArrowGlyph(6080767, -1, 1);
-      arrow.position.set(cfg.x, continentHeight(cfg.x, cfg.z) + 4, cfg.z);
-      landGroup.add(arrow);
-      landArrows.push(arrow);
-    });
-    const divergentGroup = new Group();
-    divergentGroup.name = "DivergentEffects";
-    divergentGroup.visible = false;
-    root.add(divergentGroup);
-    const riftCoreGlow = createGlowStrip(4, S.depth - 6, 16733440, 0);
-    riftCoreGlow.rotation.x = -Math.PI * 0.5;
-    riftCoreGlow.position.set(S.ridgeX, oceanFloorHeight(S.ridgeX, 0) + 1.2, 0);
-    divergentGroup.add(riftCoreGlow);
-    const riftOuterGlow = createGlowStrip(18, S.depth - 4, 16747552, 0);
-    riftOuterGlow.rotation.x = -Math.PI * 0.5;
-    riftOuterGlow.position.set(S.ridgeX, oceanFloorHeight(S.ridgeX, 0) + 0.5, 0);
-    divergentGroup.add(riftOuterGlow);
-    const magmaVentsDiv = [];
-    [
-      { xOff: 0, z: -30, r: 3.5, h: 14, col: 16738816, opa: 0 },
-      { xOff: 1.5, z: 4, r: 2.8, h: 12, col: 16729344, opa: 0 },
-      { xOff: -1, z: 28, r: 3, h: 13, col: 16733440, opa: 0 },
-      { xOff: 0.8, z: -12, r: 2.2, h: 10, col: 16740352, opa: 0 },
-      { xOff: -0.5, z: 18, r: 2.5, h: 11, col: 16736256, opa: 0 }
-    ].forEach((cfg) => {
-      const vent = new Mesh(
-        new CylinderGeometry(cfg.r * 0.3, cfg.r, cfg.h, 12, 1, true),
-        new MeshBasicMaterial({
-          color: cfg.col,
-          transparent: true,
-          opacity: cfg.opa,
-          depthWrite: false,
-          blending: AdditiveBlending
-        })
-      );
-      const ridgeY = oceanFloorHeight(S.ridgeX + cfg.xOff, cfg.z);
-      vent.position.set(S.ridgeX + cfg.xOff, ridgeY + cfg.h * 0.5, cfg.z);
-      divergentGroup.add(vent);
-      magmaVentsDiv.push({ mesh: vent, baseY: ridgeY, h: cfg.h, xOff: cfg.xOff, z: cfg.z });
-    });
-    const newCrustLeft = new Mesh(
-      new BoxGeometry(0.5, 2.5, S.depth - 12),
-      new MeshBasicMaterial({
-        color: 16740384,
-        transparent: true,
-        opacity: 0,
-        depthWrite: false,
-        blending: AdditiveBlending
-      })
-    );
-    newCrustLeft.position.set(S.ridgeX - 0.25, oceanFloorHeight(S.ridgeX, 0) - 0.5, 0);
-    divergentGroup.add(newCrustLeft);
-    const newCrustRight = newCrustLeft.clone();
-    newCrustRight.position.set(S.ridgeX + 0.25, oceanFloorHeight(S.ridgeX, 0) - 0.5, 0);
-    divergentGroup.add(newCrustRight);
-    const divergentLeftBlock = new Group();
-    divergentLeftBlock.name = "DivergentLeft";
-    root.add(divergentLeftBlock);
-    const divergentRightBlock = new Group();
-    divergentRightBlock.name = "DivergentRight";
-    root.add(divergentRightBlock);
-    const hydroVents = [];
-    [
-      { xOff: -1.2, z: -24 },
-      { xOff: 1.4, z: 10 },
-      { xOff: -0.6, z: 34 }
-    ].forEach((cfg) => {
-      const ventGlow = new Mesh(
-        new SphereGeometry(1.8, 8, 8),
-        new MeshBasicMaterial({
-          color: 58879,
-          transparent: true,
-          opacity: 0,
-          depthWrite: false,
-          blending: AdditiveBlending
-        })
-      );
-      const y = oceanFloorHeight(S.ridgeX + cfg.xOff, cfg.z);
-      ventGlow.position.set(S.ridgeX + cfg.xOff, y + 1.5, cfg.z);
-      divergentGroup.add(ventGlow);
-      hydroVents.push({ mesh: ventGlow, baseY: y });
-    });
-    const riftLinePoints = [];
-    for (let i = 0; i <= 80; i++) {
-      const t = i / 80;
-      const z = S.frontZ + 0.4;
-      const y = mix(S.mantleTop, oceanFloorHeight(S.ridgeX, 0) + 1, t);
-      riftLinePoints.push(new Vector3(S.ridgeX, y, z));
+    root.add(createLayeredSideWall(S.xMin, textures));
+    root.add(createLayeredSideWall(S.xMax, textures));
+    {
+      const btmW = S.xMax - S.xMin;
+      const btmD = S.depth;
+      const centerX = (S.xMin + S.xMax) * 0.5;
+      const btmSegX = 60, btmSegZ = 28;
+      const btmPosArr = [], btmUvArr = [], btmIdxArr = [];
+      for (let iz = 0; iz <= btmSegZ; iz++) {
+        for (let ix = 0; ix <= btmSegX; ix++) {
+          const x = S.xMin + btmW / btmSegX * ix;
+          const z = S.backZ + btmD / btmSegZ * iz;
+          btmPosArr.push(x, S.basementBottom, z);
+          btmUvArr.push(ix / btmSegX * (btmW / 8), iz / btmSegZ * (btmD / 8));
+        }
+      }
+      for (let iz = 0; iz < btmSegZ; iz++) {
+        for (let ix = 0; ix < btmSegX; ix++) {
+          const a = iz * (btmSegX + 1) + ix;
+          const b = a + 1;
+          const c = a + (btmSegX + 1);
+          const d = c + 1;
+          btmIdxArr.push(a, c, b, b, c, d);
+        }
+      }
+      const btmGeo = new BufferGeometry();
+      btmGeo.setAttribute("position", new Float32BufferAttribute(btmPosArr, 3));
+      btmGeo.setAttribute("uv", new Float32BufferAttribute(btmUvArr, 2));
+      btmGeo.setIndex(btmIdxArr);
+      btmGeo.computeVertexNormals();
+      const btmRockColor = textures.rockColor.clone();
+      btmRockColor.wrapS = btmRockColor.wrapT = RepeatWrapping;
+      btmRockColor.repeat.set(24, 10);
+      btmRockColor.needsUpdate = true;
+      const btmBump = textures.rockBump.clone();
+      btmBump.wrapS = btmBump.wrapT = RepeatWrapping;
+      btmBump.repeat.set(24, 10);
+      btmBump.needsUpdate = true;
+      const btmMat = new MeshStandardMaterial({
+        color: 2365968,
+        map: btmRockColor,
+        bumpMap: btmBump,
+        bumpScale: 0.5,
+        roughness: 0.97,
+        metalness: 0.03,
+        emissive: new Color(1708552),
+        emissiveIntensity: 0.6,
+        side: DoubleSide
+      });
+      const bottomPlane = new Mesh(btmGeo, btmMat);
+      bottomPlane.receiveShadow = true;
+      root.add(bottomPlane);
     }
-    const riftLineGeo = new BufferGeometry().setFromPoints(riftLinePoints);
-    const riftLineMat = new LineBasicMaterial({
-      color: 16737792,
-      transparent: true,
-      opacity: 0,
-      blending: AdditiveBlending,
-      depthWrite: false,
-      linewidth: 2
-    });
-    const riftLine = new Line(riftLineGeo, riftLineMat);
-    divergentGroup.add(riftLine);
-    const divArrowsLeft = [];
-    [
-      { x: S.ridgeX - 22, y: S.seaLevel + 2, z: -28 },
-      { x: S.ridgeX - 26, y: S.seaLevel + 1.8, z: 0 },
-      { x: S.ridgeX - 20, y: S.seaLevel + 2.2, z: 30 }
-    ].forEach((cfg) => {
-      const arrow = createArrowGlyph(16750848, -1, 1.5);
-      arrow.position.set(cfg.x, cfg.y, cfg.z);
-      arrow.visible = false;
-      divergentGroup.add(arrow);
-      divArrowsLeft.push({ mesh: arrow, baseX: cfg.x, baseY: cfg.y });
-    });
-    const divArrowsRight = [];
-    [
-      { x: S.ridgeX + 22, y: S.seaLevel + 2, z: -22 },
-      { x: S.ridgeX + 26, y: S.seaLevel + 1.8, z: 5 },
-      { x: S.ridgeX + 20, y: S.seaLevel + 2.2, z: 32 }
-    ].forEach((cfg) => {
-      const arrow = createArrowGlyph(16750848, 1, 1.5);
-      arrow.position.set(cfg.x, cfg.y, cfg.z);
-      arrow.visible = false;
-      divergentGroup.add(arrow);
-      divArrowsRight.push({ mesh: arrow, baseX: cfg.x, baseY: cfg.y });
-    });
-    const baseGlow = createGlowStrip(S.xMax - S.xMin + 18, 18, 16739630, 0.12);
-    baseGlow.rotation.x = -Math.PI * 0.5;
-    baseGlow.position.set((S.xMin + S.xMax) * 0.5, S.mantleBottom + 1.5, 0);
-    root.add(baseGlow);
+    {
+      const lwX = 40;
+      const lwZ = S.frontZ;
+      const lwSurfaceY = continentHeight(lwX, lwZ);
+      const lwOilLayerY = oilGasBoundAt(lwX, lwZ) - 2;
+      const landWell = createLandOilWell(lwX, lwZ, lwSurfaceY, lwOilLayerY);
+      root.add(landWell);
+    }
+    {
+      const owX = -55;
+      const owZ = 10;
+      const owSeaLevel = S.seaLevel;
+      const owSeabedY = oceanFloorHeight(owX, owZ);
+      const owOilLayerY = oilGasBoundAt(owX, owZ) - 2;
+      const offshorePlatform = createOffshoreOilPlatform(owX, owZ, owSeaLevel, owSeabedY, owOilLayerY);
+      root.add(offshorePlatform);
+    }
     const anchors = {
-      ridge: new Vector3(),
-      shallowSea: new Vector3(),
-      india: new Vector3(),
-      eurasia: new Vector3(),
-      lithosphere: new Vector3(),
-      asthenosphere: new Vector3(),
-      subduction: new Vector3(),
-      himalaya: new Vector3()
+      ridge: new Vector3(S.ridgeX + 6, S.seaLevel + 18, -8),
+      india: new Vector3(-15, S.seaLevel + 12, -18),
+      eurasia: new Vector3(80, S.eurAsiaPeakMax + 12, 18),
+      // 石油地下锚点（用于标签）
+      gasZone: new Vector3(-15, S.oilGasBound + 3, S.frontZ),
+      oilZone: new Vector3(-15, (S.waterOilBound + S.oilGasBound) * 0.5, S.frontZ),
+      waterZone: new Vector3(-15, S.reservoirBottom + 2, S.frontZ),
+      waterproof: new Vector3(40, S.waterproofBottom + 3, S.frontZ),
+      capRock: new Vector3(-50, S.capRockBottom + 3, S.frontZ)
     };
-    function getLandLocalY(x, z) {
-      return continentHeight(x, z) * landGroup.scale.y;
-    }
-    function getLandWorldY(x, z) {
-      return landGroup.position.y + getLandLocalY(x, z);
-    }
-    function updateAnchors(progress) {
-      anchors.india.set(-15, S.seaLevel + 10, -15);
-      anchors.ridge.set(S.ridgeX + 6, oceanFloorHeight(S.ridgeX, -6) + 11, -8);
-      anchors.shallowSea.set(-50, S.seaLevel + 8 + progress * 0.3, 5);
-      anchors.eurasia.set(80, getLandWorldY(80, 16) + 13, 16);
-      anchors.lithosphere.set(-60, -6, S.frontZ);
-      anchors.asthenosphere.set(10, -42, S.frontZ);
-      anchors.subduction.set(S.coastMeanX + 5 + progress * 2.5, -10 - progress * 1.8, S.frontZ);
-      anchors.himalaya.set(45, getLandWorldY(45, 0) + 6, 0);
-    }
-    updateAnchors(0);
     return {
       update(progress, intensity, boundaryType) {
-        const converge = boundaryType === "convergent";
-        const t = performance.now() * 1e-3;
-        if (converge) {
-          const pT = progress;
-          const intensityGain = 0.76 + intensity * 0.18;
-          const landScale = 0.99 + pT * 0.1 * intensityGain;
-          landGroup.scale.y = landScale;
-          landGroup.position.y = S.lithBottom * (1 - landScale) * 0.65;
-          landGroup.position.x = pT * 1.2;
-          mountainDetailMesh.scale.copy(landGroup.scale);
-          mountainDetailMesh.position.copy(landGroup.position);
-          snowCaps.scale.copy(landGroup.scale);
-          snowCaps.position.copy(landGroup.position);
-          slabGroup.visible = true;
-          slabGroup.position.x = pT * 4.8;
-          slabGroup.position.y = -pT * 2.5;
-          slabGroup.rotation.z = -0.04 - pT * 0.08 * intensityGain;
-          magmaColumn.visible = true;
-          magmaColumn.scale.y = 0.86 + pT * 0.34 * intensityGain;
-          magmaColumn.material.opacity = 0.22 + pT * 0.16 + intensity * 0.03;
-          waterSurface.material.opacity = 0.68 + intensity * 0.03;
-          waterBack.material.opacity = 0.42 + intensity * 0.03;
-          shorelineFoam.material.opacity = 0.14 + pT * 0.08 + intensity * 0.02;
-          {
-            const bayFade = 1 - Math.max(0, (pT - 0.3) / 0.55);
-            const bayOpacity = Math.max(0, Math.min(0.7, 0.7 * bayFade));
-            bayWater.material.opacity = bayOpacity;
-            bayWater.visible = bayOpacity > 0.01;
-            const bayLift = pT * 0.8 * (1 - bayFade);
-            bayWater.position.y = bayLift;
-          }
-          ridgeGlow.material.opacity = 0.12 + intensity * 0.03;
-          trenchGlow.material.opacity = 0.08 + pT * 0.07;
-          mantleGlow.material.opacity = 0.2 + pT * 0.1 + intensity * 0.03;
-          baseGlow.material.opacity = 0.1 + intensity * 0.03;
-          slabGlow.material.opacity = 0.08 + pT * 0.1;
-          ridgeArrowsLeft.forEach((arrow, idx) => {
-            arrow.visible = true;
-            arrow.position.y = S.seaLevel + 0.8 + Math.sin(t * 1.2 + idx) * 0.3;
-          });
-          ridgeArrowsRight.forEach((arrow, idx) => {
-            arrow.visible = true;
-            arrow.position.y = S.seaLevel + 0.8 + Math.sin(t * 1.2 + idx + 1) * 0.3;
-          });
-          oceanArrows.forEach((arrow, index) => {
-            arrow.visible = true;
-            arrow.position.y = S.seaLevel + 0.6 + pT * 0.3 + index * 0.05;
-          });
-          landArrows[0].position.y = getLandLocalY(40, -10) + 4;
-          landArrows[1].position.y = getLandLocalY(80, 14) + 4;
-          divergentGroup.visible = false;
-          if (deps.magmaLight1) deps.magmaLight1.intensity = 6.2 + intensity * 0.8 + pT * 1.8;
-          if (deps.magmaLight2) deps.magmaLight2.intensity = 4.2 + pT * 1.4;
-          if (deps.subductionLight) deps.subductionLight.intensity = 3 + pT * 1.35;
-          if (deps.bloomPass) {
-            deps.bloomPass.strength = 0.28 + intensity * 0.08 + pT * 0.08;
-            deps.bloomPass.radius = 0.82;
-            deps.bloomPass.threshold = 0.57;
-          }
-          updateAnchors(pT);
-        } else {
-          const pD = progress;
-          const intensityGain = 0.76 + intensity * 0.18;
-          landGroup.scale.y = 1;
-          landGroup.position.y = 0;
-          landGroup.position.x = 0;
-          mountainDetailMesh.scale.copy(landGroup.scale);
-          mountainDetailMesh.position.copy(landGroup.position);
-          snowCaps.scale.copy(landGroup.scale);
-          snowCaps.position.copy(landGroup.position);
-          slabGroup.visible = false;
-          magmaColumn.visible = false;
-          oceanArrows.forEach((a) => {
-            a.visible = false;
-          });
-          ridgeArrowsLeft.forEach((a) => {
-            a.visible = false;
-          });
-          ridgeArrowsRight.forEach((a) => {
-            a.visible = false;
-          });
-          landArrows.forEach((a) => {
-            a.visible = false;
-          });
-          bayWater.material.opacity = 0.7;
-          bayWater.visible = true;
-          bayWater.position.y = 0;
-          divergentGroup.visible = true;
-          const phase1 = smoothstep2(0, 0.2, pD);
-          const phase2 = smoothstep2(0.15, 0.45, pD);
-          const phase3 = smoothstep2(0.4, 0.72, pD);
-          const phase4 = smoothstep2(0.68, 1, pD);
-          const riftPulse = 0.85 + Math.sin(t * 2.8) * 0.15;
-          const riftCore = (phase1 * 0.15 + phase2 * 0.28 + phase3 * 0.2 + phase4 * 0.12) * intensityGain * riftPulse;
-          const riftOuter = (phase1 * 0.08 + phase2 * 0.18 + phase3 * 0.14 + phase4 * 0.1) * intensityGain * riftPulse;
-          riftCoreGlow.material.opacity = clamp2(riftCore, 0, 0.75);
-          riftOuterGlow.material.opacity = clamp2(riftOuter, 0, 0.5);
-          riftLineMat.opacity = clamp2(phase2 * 0.65 * intensityGain, 0, 0.7);
-          ridgeGlow.material.opacity = 0.12 + phase1 * 0.18 + phase2 * 0.26 + phase3 * 0.14 + Math.sin(t * 1.8) * 0.04 * phase2;
-          magmaVentsDiv.forEach((vent, idx) => {
-            const stagger = idx * 0.08;
-            const ventPhase = smoothstep2(0.1 + stagger, 0.4 + stagger, pD);
-            const pulse = 0.82 + Math.sin(t * (1.6 + idx * 0.4) + idx * 1.3) * 0.18;
-            const targetOpa = clamp2(ventPhase * (0.32 + phase3 * 0.18 + phase4 * 0.08) * intensityGain * pulse, 0, 0.65);
-            vent.mesh.material.opacity = targetOpa;
-            const ventLift = ventPhase * 2.5 * (0.9 + Math.sin(t * 1.1 + idx) * 0.1);
-            vent.mesh.position.y = vent.baseY + vent.h * 0.5 + ventLift;
-            vent.mesh.scale.y = 1 + ventPhase * 0.5 + Math.sin(t * 2.2 + idx) * 0.12 * ventPhase;
-          });
-          const crustBrightness = clamp2(phase2 * 0.22 + phase3 * 0.18 + phase4 * 0.12, 0, 0.45) * intensityGain * (0.9 + Math.sin(t * 1.5) * 0.1);
-          newCrustLeft.material.opacity = crustBrightness;
-          newCrustRight.material.opacity = crustBrightness;
-          const crustSpread = phase2 * 1.8 + phase3 * 2.5 + phase4 * 1.2;
-          newCrustLeft.position.x = S.ridgeX - 0.25 - crustSpread;
-          newCrustRight.position.x = S.ridgeX + 0.25 + crustSpread;
-          hydroVents.forEach((hv, idx) => {
-            const hvPhase = smoothstep2(0.25 + idx * 0.12, 0.55 + idx * 0.1, pD);
-            const hvPulse = 0.8 + Math.sin(t * (2.4 + idx * 0.7) + idx * 2.1) * 0.2;
-            hv.mesh.material.opacity = clamp2(hvPhase * 0.55 * intensityGain * hvPulse, 0, 0.65);
-            hv.mesh.position.y = hv.baseY + 1.5 + hvPhase * 2.5 + Math.sin(t * 1.8 + idx) * 0.4 * hvPhase;
-            hv.mesh.scale.setScalar(1 + hvPhase * 0.6 + Math.sin(t * 2.8 + idx) * 0.15 * hvPhase);
-          });
-          const arrowVis = phase1 > 0.1;
-          divArrowsLeft.forEach((a, idx) => {
-            a.mesh.visible = arrowVis;
-            const drift = phase2 * 8 + phase3 * 12 + phase4 * 8;
-            a.mesh.position.x = a.baseX - drift;
-            a.mesh.position.y = a.baseY + Math.sin(t * 1.3 + idx) * 0.4;
-            const opacity = clamp2(phase1 * 0.5 + phase2 * 0.4 + phase3 * 0.1, 0, 0.95);
-            a.mesh.children.forEach((child) => {
-              if (child.material) child.material.opacity = opacity;
-            });
-          });
-          divArrowsRight.forEach((a, idx) => {
-            a.mesh.visible = arrowVis;
-            const drift = phase2 * 8 + phase3 * 12 + phase4 * 8;
-            a.mesh.position.x = a.baseX + drift;
-            a.mesh.position.y = a.baseY + Math.sin(t * 1.3 + idx + 1) * 0.4;
-            const opacity = clamp2(phase1 * 0.5 + phase2 * 0.4 + phase3 * 0.1, 0, 0.95);
-            a.mesh.children.forEach((child) => {
-              if (child.material) child.material.opacity = opacity;
-            });
-          });
-          waterSurface.material.opacity = 0.68 + intensity * 0.02;
-          waterBack.material.opacity = 0.42 + intensity * 0.02;
-          shorelineFoam.material.opacity = 0.14 + intensity * 0.02;
-          trenchGlow.material.opacity = 0.06;
-          mantleGlow.material.opacity = 0.22 + phase2 * 0.18 + phase3 * 0.1 + intensity * 0.03 + Math.sin(t * 1.4) * 0.04 * phase2;
-          baseGlow.material.opacity = 0.12 + phase1 * 0.04 + intensity * 0.03;
-          if (deps.magmaLight2) {
-            deps.magmaLight2.intensity = 4.2 + phase2 * 4.5 + phase3 * 3 + Math.sin(t * 2.2) * 0.6 * phase2 * intensityGain;
-          }
-          if (deps.magmaLight1) {
-            deps.magmaLight1.intensity = 3 + intensity * 0.4;
-          }
-          if (deps.subductionLight) {
-            deps.subductionLight.intensity = 1.5 + phase2 * 2.5 + Math.sin(t * 3) * 0.4 * phase2 * intensityGain;
-          }
-          if (deps.bloomPass) {
-            deps.bloomPass.strength = 0.22 + phase2 * 0.22 + phase3 * 0.14 + intensity * 0.06 + Math.sin(t * 2) * 0.03 * phase2;
-            deps.bloomPass.radius = 0.78 + phase3 * 0.12;
-            deps.bloomPass.threshold = 0.6 - phase2 * 0.08;
-          }
-          updateAnchors(0);
-        }
       },
       getAnchors() {
         return anchors;
@@ -45091,47 +44606,52 @@ void main() {
       init_three_module();
       S = {
         xMin: -130,
-        // 场景左边界（深海左翼）
         xMax: 110,
-        // 场景右边界（亚欧板块内陆）
         depth: 112,
         halfDepth: 56,
         frontZ: 56,
         backZ: -56,
         seaLevel: 5,
-        // 海平面（X轴上方5单位）
+        // 地表岩石底（原岩石圈底）
         lithBottom: -15,
-        // 岩石圈底（X轴下方15单位，高度差=15）
-        mantleTop: -15,
-        // 软流层顶（与岩石圈底一致）
-        mantleBottom: -65,
-        // 软流层底（高度差=50）
+        // 地下分层边界（从下往上）
+        basementBottom: -80,
+        // 基底岩石底
+        basementTop: -65,
+        // 基底岩石顶 / 不透水底层底
+        waterproofBottom: -65,
+        // 不透水底层底
+        waterproofTop: -50,
+        // 不透水底层顶 / 储集层底
+        reservoirBottom: -50,
+        // 储集层底（地层水底）
+        reservoirTop: -28,
+        // 储集层顶（拱顶顶部）
+        capRockBottom: -28,
+        // 盖层底
+        capRockTop: -15,
+        // 盖层顶 / 浅层砂岩底
+        surfaceRockTop: 0,
+        // 浅层砂岩顶（地表）
+        // 储集层内三分：water/oil/gas 边界
+        // 地层水在底部，石油在中间，天然气在拱顶
+        // 这些是"平均"高度，实际储集层面随拱形波动
+        waterOilBound: -43,
+        // 水-油边界（在储集层内，向上）
+        oilGasBound: -36,
+        // 油-气边界（拱顶附近）
         ridgeX: -75,
-        // 洋中脊中心（深海区右侧，10宽居中）
         coastMeanX: 0,
-        // 印度板块东岸/俯冲带平均X位置
-        // 印度板块陆地西岸均值（浅海东边界/印度陆地西边界）
         indiaWestMeanX: -30,
-        // 印度板块陆地东岸均值（俯冲带/海湾西边界）
         indiaEastMeanX: 0,
-        // 亚欧板块起始（俯冲带右侧）
         eurasiaStartX: 10,
-        // 亚欧板块山脉（喜马拉雅）范围
         mountainStartX: 14,
-        // 山脉起始（紧靠俯冲带）
         mountainEndX: 80,
-        // 山脉结束
         snowBase: 12,
-        // 积雪线（Y>12开始有雪）
-        // 高度上限
         plainMax: 5,
-        // 普通陆地最高点（平原/低地）
         indiaPeakMax: 10,
-        // 印度板块山脉最高点
         eurAsiaPeakMax: 15,
-        // 亚欧板块山脉最高点
         mountainWidth: 8
-        // 亚欧山脉最大宽度（Z轴方向）
       };
     }
   });
@@ -45159,31 +44679,28 @@ void main() {
         frontZ: 56,
         backZ: -56,
         seaLevel: 5,
-        lithBottom: -15,
-        mantleTop: -15,
-        mantleBottom: -65,
+        basementBottom: -80,
+        basementTop: -65,
+        waterproofBottom: -65,
+        waterproofTop: -50,
+        reservoirBottom: -50,
+        reservoirTop: -28,
+        capRockBottom: -28,
+        capRockTop: -15,
+        surfaceRockTop: 0,
+        waterOilBound: -43,
+        oilGasBound: -36,
         ridgeX: -75,
-        coastMeanX: 0,
-        indiaWestMeanX: -30,
-        indiaEastMeanX: 0,
-        eurasiaStartX: 10,
-        mountainStartX: 14,
-        mountainEndX: 80,
-        snowBase: 18,
-        indiaPeakMax: 15,
-        eurAsiaPeakMax: 25
+        eurAsiaPeakMax: 15
       };
       TectonicModel = class {
         constructor(container) {
           this.container = container;
           this.state = {
-            time: 0,
-            intensity: 1,
-            boundaryType: "convergent",
             autoRotate: false,
             clock: 0,
-            isPlaying: false,
-            playSpeed: 0.5
+            keys: {}
+            // 当前按下的按键
           };
           this.animationId = null;
           this.prevTime = performance.now();
@@ -45212,21 +44729,86 @@ void main() {
 <div class="app">
 <style>
 #tectonicCanvas { width: 100%; height: 100%; }
+
+/* \u2500\u2500 \u5730\u5C42\u6807\u7B7E\u6837\u5F0F \u2500\u2500 */
+.geo-teach-label {
+    pointer-events: none;
+    /* \u6807\u7B7E\u5411\u5DE6\u5C55\u5F00\uFF0C\u951A\u70B9\u5728\u6807\u7B7E\u6700\u53F3\u7AEF\uFF08\u5373\u7BAD\u5934\u5C16\u7AEF\u5904\uFF09 */
+    transform: translateX(-100%) translateY(-50%);
+    white-space: nowrap;
+    position: relative;
+    display: inline-block;
+}
+.geo-teach-label__box {
+    display: inline-flex;
+    align-items: center;
+    gap: 6px;
+    padding: 5px 10px 5px 10px;
+    background: rgba(4, 10, 22, 0.88);
+    border: 1px solid var(--label-border, #aaa);
+    border-left: 3px solid var(--label-border, #aaa);
+    border-radius: 3px;
+    font-family: 'Courier New', 'Consolas', monospace;
+    font-size: 11.5px;
+    letter-spacing: 0.06em;
+    color: #e8eef8;
+    box-shadow: 0 0 12px var(--label-glow, rgba(200,200,200,0.2)),
+                inset 0 0 6px rgba(255,255,255,0.02);
+    backdrop-filter: blur(3px);
+    -webkit-backdrop-filter: blur(3px);
+}
+/* \u7BAD\u5934\uFF1A\u6807\u7B7E\u53F3\u4FA7\u6307\u5411\u53F3\u65B9\uFF08\u6307\u5411\u573A\u666F\u5185\uFF09 */
+.geo-teach-label__arrow {
+    display: inline-block;
+    width: 32px;
+    height: 2px;
+    background: linear-gradient(90deg, var(--label-border, #aaa), transparent);
+    position: relative;
+    vertical-align: middle;
+    flex-shrink: 0;
+    margin-left: 2px;
+}
+.geo-teach-label__arrow::after {
+    content: '';
+    position: absolute;
+    right: 0;
+    top: 50%;
+    transform: translateY(-50%);
+    border-left: 7px solid var(--label-border, #aaa);
+    border-top: 5px solid transparent;
+    border-bottom: 5px solid transparent;
+}
+/* \u7EC8\u70B9\u5149\u70B9 */
+.geo-teach-label__dot {
+    position: absolute;
+    right: -5px;
+    top: 50%;
+    transform: translateY(-50%);
+    width: 6px;
+    height: 6px;
+    border-radius: 50%;
+    background: var(--label-border, #aaa);
+    box-shadow: 0 0 6px var(--label-glow, rgba(200,200,200,0.4));
+    animation: geoDotPulse 2.2s ease-in-out infinite;
+}
+@keyframes geoDotPulse {
+    0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
+    50%       { opacity: 0.5; transform: translateY(-50%) scale(1.6); }
+}
 </style>
 <header class="header">
     <div class="scan-line"></div>
     <div class="header-left">
-        <div class="header-logo">\u{1F30B}</div>
+        <div class="header-logo">\u{1F6E2}</div>
         <div class="title-block">
-            <div class="title-main">\u677F\u5757\u6784\u9020\u8FD0\u52A8</div>
-            <div class="title-sub">PLATE TECTONICS MODEL v4.0</div>
+            <div class="title-main">\u5730\u4E0B\u77F3\u6CB9\u5730\u5C42\u7ED3\u6784</div>
+            <div class="title-sub">SUBSURFACE OIL RESERVOIR MODEL v2.0</div>
         </div>
     </div>
     <div class="header-center">
-        <div class="header-badge active" id="boundaryTypeBadge">\u25B6 \u6D88\u4EA1\u8FB9\u754C \xB7 CONVERGENT</div>
+        <div class="header-badge active">\u25B6 \u50A8\u96C6\u5C42\u5256\u9762 \xB7 RESERVOIR CROSS-SECTION</div>
     </div>
     <div class="header-right">
-        <button id="backToMenuBtn">\u{1F3E0} \u8FD4\u56DE\u83DC\u5355</button>
         <div class="status-group">
             <div class="status-dot"></div>
             <div class="status-label">ONLINE</div>
@@ -45234,28 +44816,6 @@ void main() {
     </div>
 </header>
 
-<aside class="side-panel left-panel">
-    <div class="panel-block orange-accent">
-        <div class="block-title orange">\u677F\u5757\u52A8\u529B\u53C2\u6570</div>
-        <div class="data-row"><span class="data-key">\u677F\u5757\u6536\u655B\u901F\u5EA6</span><span class="data-val" id="collisionVelocity">0.0 cm/yr</span></div>
-        <div class="data-row"><span class="data-key">\u4FEF\u51B2\u6DF1\u5EA6</span><span class="data-val" id="collisionDepth">0 km</span></div>
-        <div class="data-row"><span class="data-key">\u5730\u8868\u9686\u8D77\u9AD8\u5EA6</span><span class="data-val" id="upliftHeight">0 m</span></div>
-        <div class="data-row"><span class="data-key">\u6D77\u6C9F\u6DF1\u5EA6</span><span class="data-val cyan" id="trenchDepth">0 m</span></div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u5730\u7403\u7269\u7406\u73AF\u5883</div>
-        <div class="data-row"><span class="data-key">\u5730\u6E29\u68AF\u5EA6</span><span class="data-val yellow" id="temperature">1200 \xB0C</span></div>
-        <div class="data-row"><span class="data-key">\u5730\u5E54\u538B\u529B</span><span class="data-val" id="pressure">0.1 GPa</span></div>
-        <div class="data-row"><span class="data-key">\u6784\u9020\u5E94\u529B</span><span class="data-val" id="stress">5 MPa</span></div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u5730\u8D28\u5E74\u4EE3</div>
-        <div style="text-align:center;padding:5px 0">
-            <div style="font-size:20px;color:var(--cyan);text-shadow:0 0 14px var(--glow-c);font-weight:bold" id="geologicalPeriod">\u592A\u53E4\u4EE3</div>
-            <div style="font-size:9.5px;color:var(--text3);margin-top:4px" id="timeEra">Archean Eon</div>
-        </div>
-    </div>
-</aside>
 
 <main class="canvas-wrap">
     <div id="tectonicCanvas"></div>
@@ -45263,44 +44823,10 @@ void main() {
     <div class="corner-deco tr"></div>
     <div class="corner-deco bl"></div>
     <div class="corner-deco br"></div>
-    <div class="axis-hint">\u{1F5B1} \u62D6\u62FD\u65CB\u8F6C \xB7 \u6EDA\u8F6E\u7F29\u653E \xB7 \u805A\u7126\u5256\u9762\u4E3B\u4F53</div>
+    <div class="axis-hint">\u{1F5B1} \u5DE6\u952E\u62D6\u62FD\u65CB\u8F6C \xB7 \u53F3\u952E/\u4E2D\u952E\u5E73\u79FB \xB7 \u6EDA\u8F6E\u7F29\u653E</div>
 </main>
 
 <aside class="side-panel right-panel">
-    <div class="panel-block">
-        <div class="block-title">\u5730\u8D28\u65F6\u95F4\u8F74</div>
-        <div class="slider-wrap">
-            <div class="slider-header">
-                <span class="slider-label">\u65F6\u95F4\u8FDB\u7A0B</span>
-                <span class="slider-value-display cyan" id="timeDisplay">0</span>
-            </div>
-            <input type="range" id="timeSlider" min="0" max="100" value="0" step="1" style="--pct:0%">
-            <div class="slider-ticks"><span>0 Ma</span><span>25</span><span>50</span><span>75</span><span>100 Ma</span></div>
-        </div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u65F6\u95F4\u63A7\u5236</div>
-        <div class="btn-group">
-            <button class="btn" id="playBtn"><span class="btn-icon">\u25B6</span><span class="btn-text">\u81EA\u52A8\u64AD\u653E</span></button>
-        </div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u677F\u5757\u52A8\u529B\u5F3A\u5EA6</div>
-        <div class="slider-wrap">
-            <div class="slider-header">
-                <span class="slider-label">\u5F3A\u5EA6\u7CFB\u6570</span>
-                <span class="slider-value-display" id="intensityDisplay">1.0</span>
-            </div>
-            <input type="range" id="intensitySlider" min="0.1" max="3.0" value="1.0" step="0.1" style="--pct:31%">
-        </div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u677F\u5757\u8FB9\u754C\u7C7B\u578B</div>
-        <div class="btn-group">
-            <button class="btn active" id="convergentBtn"><span class="btn-icon">\u26F0</span><span class="btn-text">\u6D88\u4EA1\u8FB9\u754C</span></button>
-            <button class="btn" id="divergentBtn"><span class="btn-icon">\u{1F30A}</span><span class="btn-text">\u751F\u957F\u8FB9\u754C</span></button>
-        </div>
-    </div>
     <div class="panel-block">
         <div class="block-title">\u89C6\u89D2\u63A7\u5236</div>
         <div class="btn-group">
@@ -45308,14 +44834,15 @@ void main() {
             <button class="btn" id="toggleAutoRotate"><span class="btn-icon">\u{1F504}</span><span class="btn-text">\u81EA\u52A8\u65CB\u8F6C</span></button>
         </div>
     </div>
+    <div class="panel-block">
+        <div class="block-title">\u5256\u9762\u89C6\u89D2</div>
+        <div class="btn-group">
+            <button class="btn" id="frontViewBtn"><span class="btn-icon">\u{1F4D0}</span><span class="btn-text">\u6B63\u5256\u9762</span></button>
+            <button class="btn" id="topViewBtn"><span class="btn-icon">\u{1F52D}</span><span class="btn-text">\u4FEF\u77B0\u89C6\u89D2</span></button>
+        </div>
+    </div>
 </aside>
 
-<footer class="footer">
-    <div class="footer-item"><span class="footer-label">\u5730\u8D28\u65F6\u671F</span><span class="footer-value" id="geoFooterPeriod">\u592A\u53E4\u4EE3</span></div>
-    <div class="footer-item"><span class="footer-label">\u677F\u5757\u8FD0\u52A8</span><span class="footer-value" id="motionStatus">\u9759\u6B62</span></div>
-    <div class="footer-item"><span class="footer-label">\u8FB9\u754C\u6A21\u5F0F</span><span class="footer-value orange" id="boundaryMode">\u6D88\u4EA1\u8FB9\u754C</span></div>
-    <div class="footer-item"><span class="footer-label">\u5E27\u7387</span><span class="footer-value green" id="fps">\u2014</span></div>
-</footer>
 </div>
 `;
         }
@@ -45331,8 +44858,8 @@ void main() {
           this.renderer.setSize(this.width, this.height);
           this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
           this.renderer.shadowMap.enabled = true;
-          this.renderer.toneMapping = ACESFilmicToneMapping;
-          this.renderer.toneMappingExposure = 0.92;
+          this.renderer.toneMapping = LinearToneMapping;
+          this.renderer.toneMappingExposure = 1;
           this.css2dRenderer = new CSS2DRenderer();
           this.css2dRenderer.setSize(this.width, this.height);
           this.css2dRenderer.domElement.style.position = "absolute";
@@ -45355,24 +44882,35 @@ void main() {
           this.controls = new OrbitControls(this.camera, this.renderer.domElement);
           this.controls.enableDamping = true;
           this.controls.dampingFactor = 0.06;
-          this.controls.enablePan = false;
-          this.controls.minDistance = 105;
-          this.controls.maxDistance = 360;
+          this.controls.enablePan = true;
+          this.controls.panSpeed = 0.8;
+          this.controls.screenSpacePanning = true;
+          this.controls.minDistance = 60;
+          this.controls.maxDistance = 500;
           this.controls.target.copy(this.defaultCameraTarget);
           this.controls.update();
         }
         setupLights() {
-          this.scene.add(new AmbientLight(3818848, 2));
-          const keyLight = new DirectionalLight(16773336, 1.5);
-          keyLight.position.set(180, 160, 130);
+          this.scene.add(new AmbientLight(16777215, 1.6));
+          const keyLight = new DirectionalLight(16775406, 1.2);
+          keyLight.position.set(120, 200, 180);
           keyLight.castShadow = true;
           this.scene.add(keyLight);
-          this.magmaLight1 = new PointLight(16729344, 6, 250, 2);
-          this.magmaLight1.position.set(40, -40, 0);
-          this.scene.add(this.magmaLight1);
-          this.magmaLight2 = new PointLight(16738816, 4, 180, 2);
-          this.magmaLight2.position.set(-55, -40, 0);
-          this.scene.add(this.magmaLight2);
+          const fillLight1 = new DirectionalLight(13691135, 0.7);
+          fillLight1.position.set(-200, 80, -180);
+          this.scene.add(fillLight1);
+          const fillLight2 = new DirectionalLight(15266047, 0.6);
+          fillLight2.position.set(200, 60, -150);
+          this.scene.add(fillLight2);
+          const bottomLight = new DirectionalLight(16773328, 0.8);
+          bottomLight.position.set(0, -200, 0);
+          this.scene.add(bottomLight);
+          this.subsurfaceLight1 = new PointLight(16751175, 1.8, 500, 1.5);
+          this.subsurfaceLight1.position.set(10, -40, 0);
+          this.scene.add(this.subsurfaceLight1);
+          this.subsurfaceLight2 = new PointLight(16758896, 1.2, 400, 1.5);
+          this.subsurfaceLight2.position.set(-50, -35, 0);
+          this.scene.add(this.subsurfaceLight2);
         }
         setupPostProcessing() {
           this.composer = new EffectComposer(this.renderer);
@@ -45388,75 +44926,59 @@ void main() {
           this.tectonicModel = createTectonicLandscape(this.scene, {
             waterNormalTex: this.waterNormalTex,
             bloomPass: this.bloomPass,
-            magmaLight1: this.magmaLight1,
-            magmaLight2: this.magmaLight2
+            magmaLight1: this.subsurfaceLight1,
+            magmaLight2: this.subsurfaceLight2
           });
+          this.tectonicModel.update(0.5, 1, "static");
         }
         setupLabels() {
           const themes = {
             ocean: { border: "#7fdcff", glow: "rgba(88, 210, 255, 0.35)" },
             land: { border: "#f1f6ff", glow: "rgba(255, 255, 255, 0.2)" },
-            heat: { border: "#ff9a47", glow: "rgba(255, 130, 70, 0.35)" },
-            zone: { border: "#ffd167", glow: "rgba(255, 184, 54, 0.3)" }
+            gas: { border: "#a0a0a0", glow: "rgba(160, 160, 160, 0.45)" },
+            oil: { border: "#555555", glow: "rgba(80, 80, 80, 0.50)" },
+            water: { border: "#2255cc", glow: "rgba(30, 80, 200, 0.45)" },
+            rock: { border: "#a08878", glow: "rgba(160, 130, 100, 0.30)" }
           };
           const addLabel = (text, themeName, position) => {
             const root = document.createElement("div");
             root.className = "geo-teach-label";
             root.style.setProperty("--label-border", themes[themeName].border);
             root.style.setProperty("--label-glow", themes[themeName].glow);
-            root.innerHTML = `<div class="geo-teach-label__box">${text}</div><div class="geo-teach-label__line"></div><div class="geo-teach-label__dot"></div>`;
+            root.innerHTML = `<div class="geo-teach-label__box">${text}<span class="geo-teach-label__arrow"></span></div><div class="geo-teach-label__dot"></div>`;
             const obj = new CSS2DObject(root);
             obj.position.copy(position);
             this.scene.add(obj);
             return obj;
           };
+          const anchors = this.tectonicModel.getAnchors ? this.tectonicModel.getAnchors() : {};
+          const LX = 20;
+          const LZ = S2.frontZ;
           this.labels = {
-            ridge: addLabel("\u6D0B\u4E2D\u810A \xB7 \u751F\u957F\u8FB9\u754C", "ocean", new Vector3(S2.ridgeX + 6, S2.seaLevel + 18, -8)),
-            india: addLabel("\u5370\u5EA6\u6D0B\u677F\u5757", "ocean", new Vector3(-15, S2.seaLevel + 12, -18)),
-            eurasia: addLabel("\u4E9A\u6B27\u677F\u5757", "land", new Vector3(80, S2.eurAsiaPeakMax + 12, 18)),
-            asthenosphere: addLabel("\u8F6F\u6D41\u5708", "heat", new Vector3(5, (S2.mantleTop + S2.mantleBottom) * 0.5, S2.frontZ)),
-            subduction: addLabel("\u4FEF\u51B2\u5E26 \xB7 \u6D88\u4EA1\u8FB9\u754C", "zone", new Vector3(12, -10, S2.frontZ)),
-            himalaya: addLabel("\u559C\u9A6C\u62C9\u96C5\u5C71\u8109", "zone", new Vector3(45, S2.eurAsiaPeakMax + 8, -5))
+            // 储集层三分标签（从上到下：气→油→水→不透水）
+            gasZone: addLabel(
+              "\u5929\u7136\u6C14\u5C42 \xB7 Gas",
+              "gas",
+              new Vector3(LX, -20.5, LZ)
+            ),
+            oilZone: addLabel(
+              "\u77F3\u6CB9\u5C42 \xB7 Oil",
+              "oil",
+              new Vector3(LX, -28, LZ)
+            ),
+            waterZone: addLabel(
+              "\u5730\u5C42\u6C34 \xB7 Formation Water",
+              "water",
+              new Vector3(LX, -36, LZ)
+            ),
+            waterproof: addLabel(
+              "\u4E0D\u900F\u6C34\u5C42 \xB7 Waterproof",
+              "rock",
+              new Vector3(LX, -47, LZ)
+            )
           };
         }
         bindEvents() {
-          this.container.querySelector("#backToMenuBtn")?.addEventListener("click", () => {
-            Promise.resolve().then(() => (init_app_init(), app_init_exports)).then((m) => m.showWelcome());
-          });
-          this.container.querySelector("#timeSlider")?.addEventListener("input", (e) => {
-            this.state.time = parseFloat(e.target.value);
-            this.syncUI();
-            this.updateScene();
-          });
-          this.container.querySelector("#intensitySlider")?.addEventListener("input", (e) => {
-            this.state.intensity = parseFloat(e.target.value);
-            this.syncUI();
-            this.updateScene();
-          });
-          this.container.querySelector("#playBtn")?.addEventListener("click", () => {
-            this.state.isPlaying = !this.state.isPlaying;
-            const btn = this.container.querySelector("#playBtn");
-            if (btn) {
-              btn.querySelector(".btn-icon").textContent = this.state.isPlaying ? "\u23F8" : "\u25B6";
-              btn.querySelector(".btn-text").textContent = this.state.isPlaying ? "\u6682\u505C\u64AD\u653E" : "\u81EA\u52A8\u64AD\u653E";
-            }
-          });
-          this.container.querySelector("#convergentBtn")?.addEventListener("click", () => {
-            this.state.boundaryType = "convergent";
-            this.container.querySelector("#convergentBtn")?.classList.add("active");
-            this.container.querySelector("#divergentBtn")?.classList.remove("active");
-            this.container.querySelector("#boundaryTypeBadge").textContent = "\u25B6 \u6D88\u4EA1\u8FB9\u754C \xB7 CONVERGENT";
-            this.updateLabels();
-            this.updateScene();
-          });
-          this.container.querySelector("#divergentBtn")?.addEventListener("click", () => {
-            this.state.boundaryType = "divergent";
-            this.container.querySelector("#divergentBtn")?.classList.add("active");
-            this.container.querySelector("#convergentBtn")?.classList.remove("active");
-            this.container.querySelector("#boundaryTypeBadge").textContent = "\u25B6 \u751F\u957F\u8FB9\u754C \xB7 DIVERGENT";
-            this.updateLabels();
-            this.updateScene();
-          });
           this.container.querySelector("#resetViewBtn")?.addEventListener("click", () => {
             this.camera.position.copy(this.defaultCameraPosition);
             this.controls.target.copy(this.defaultCameraTarget);
@@ -45465,55 +44987,28 @@ void main() {
           this.container.querySelector("#toggleAutoRotate")?.addEventListener("click", () => {
             this.state.autoRotate = !this.state.autoRotate;
             this.controls.autoRotate = this.state.autoRotate;
+            const btn = this.container.querySelector("#toggleAutoRotate");
+            if (btn) btn.classList.toggle("active", this.state.autoRotate);
+          });
+          this.container.querySelector("#frontViewBtn")?.addEventListener("click", () => {
+            this.camera.position.set(-10, -10, 220);
+            this.controls.target.set(-10, -20, 0);
+            this.controls.update();
+          });
+          this.container.querySelector("#topViewBtn")?.addEventListener("click", () => {
+            this.camera.position.set(-10, 260, 0);
+            this.controls.target.set(-10, 0, 0);
+            this.controls.update();
           });
           window.addEventListener("resize", () => this.onResize());
-        }
-        updateLabels() {
-          const isConvergent = this.state.boundaryType === "convergent";
-          if (this.labels.subduction) this.labels.subduction.visible = isConvergent;
-          if (this.labels.himalaya) this.labels.himalaya.visible = isConvergent;
-        }
-        syncUI() {
-          const timeSlider = this.container.querySelector("#timeSlider");
-          const timeDisplay = this.container.querySelector("#timeDisplay");
-          const intensityDisplay = this.container.querySelector("#intensityDisplay");
-          if (timeSlider) {
-            timeSlider.value = this.state.time;
-            const pct = this.state.time / 100 * 100;
-            timeSlider.style.setProperty("--pct", `${pct}%`);
-          }
-          if (timeDisplay) timeDisplay.textContent = Math.round(this.state.time);
-          if (intensityDisplay) intensityDisplay.textContent = this.state.intensity.toFixed(1);
-        }
-        updateScene() {
-          const p = this.state.time / 100;
-          this.tectonicModel.update(p, this.state.intensity, this.state.boundaryType);
-          this.updateDataPanel(p);
-        }
-        updateDataPanel(progress) {
-          const setEl = (id, val) => {
-            const el = this.container.querySelector(`#${id}`);
-            if (el) el.textContent = val;
+          this._onKeyDown = (e) => {
+            this.state.keys[e.code] = true;
           };
-          setEl("collisionVelocity", `${(4.2 + progress * 3.1 * this.state.intensity).toFixed(1)} cm/yr`);
-          setEl("collisionDepth", `${Math.round(60 + progress * 520 * this.state.intensity)} km`);
-          setEl("upliftHeight", `${Math.round(600 + progress * 5600 * this.state.intensity).toLocaleString()} m`);
-          setEl("trenchDepth", `${Math.round(4200 + progress * 3600 * this.state.intensity).toLocaleString()} m`);
-          setEl("temperature", `${Math.round(960 + progress * 580 + this.state.intensity * 130)} \xB0C`);
-          setEl("pressure", `${(0.6 + progress * 18.5 * this.state.intensity).toFixed(1)} GPa`);
-          setEl("stress", `${Math.round(18 + progress * 135 * this.state.intensity)} MPa`);
-          const stages = [
-            { zh: "\u592A\u53E4\u4EE3", en: "Archean" },
-            { zh: "\u5143\u53E4\u4EE3", en: "Proterozoic" },
-            { zh: "\u53E4\u751F\u4EE3", en: "Paleozoic" },
-            { zh: "\u4E2D\u751F\u4EE3", en: "Mesozoic" },
-            { zh: "\u65B0\u751F\u4EE3", en: "Cenozoic" }
-          ];
-          const si = Math.min(Math.floor(progress * stages.length), stages.length - 1);
-          setEl("geologicalPeriod", stages[si].zh);
-          setEl("timeEra", stages[si].en);
-          setEl("geoFooterPeriod", stages[si].zh);
-          setEl("boundaryMode", this.state.boundaryType === "convergent" ? "\u6D88\u4EA1\u8FB9\u754C" : "\u751F\u957F\u8FB9\u754C");
+          this._onKeyUp = (e) => {
+            this.state.keys[e.code] = false;
+          };
+          window.addEventListener("keydown", this._onKeyDown);
+          window.addEventListener("keyup", this._onKeyUp);
         }
         onResize() {
           const canvasContainer = this.container.querySelector("#tectonicCanvas");
@@ -45537,27 +45032,38 @@ void main() {
             this.waterNormalTex.offset.x += dt * 0.02;
             this.waterNormalTex.offset.y += dt * 0.015;
           }
-          if (this.state.isPlaying) {
-            this.state.time = Math.min(100, this.state.time + dt * this.state.playSpeed * 18);
-            this.syncUI();
-            this.updateScene();
-            if (this.state.time >= 100) {
-              this.state.isPlaying = false;
-              const btn = this.container.querySelector("#playBtn");
-              if (btn) {
-                btn.querySelector(".btn-icon").textContent = "\u25B6";
-                btn.querySelector(".btn-text").textContent = "\u81EA\u52A8\u64AD\u653E";
-              }
-            }
+          if (this.subsurfaceLight1) {
+            this.subsurfaceLight1.intensity = 3 + Math.sin(this.state.clock * 0.7) * 0.4;
           }
+          this.tectonicModel.update(0.5, 1, "static");
+          this._applyKeyboardPan(dt);
           this.controls.update();
           this.composer.render();
           this.css2dRenderer.render(this.scene, this.camera);
+        }
+        _applyKeyboardPan(dt) {
+          const keys = this.state.keys;
+          const hasKey = (...codes) => codes.some((c) => keys[c]);
+          if (!hasKey("ArrowLeft", "ArrowRight", "ArrowUp", "ArrowDown", "KeyA", "KeyD", "KeyW", "KeyS")) return;
+          const dist = this.camera.position.distanceTo(this.controls.target);
+          const speed = dist * 0.6 * dt;
+          const right = new Vector3();
+          right.crossVectors(this.camera.getWorldDirection(new Vector3()), this.camera.up).normalize();
+          const up = this.camera.up.clone().normalize();
+          const delta = new Vector3();
+          if (hasKey("ArrowLeft", "KeyA")) delta.addScaledVector(right, -speed);
+          if (hasKey("ArrowRight", "KeyD")) delta.addScaledVector(right, speed);
+          if (hasKey("ArrowUp", "KeyW")) delta.addScaledVector(up, speed);
+          if (hasKey("ArrowDown", "KeyS")) delta.addScaledVector(up, -speed);
+          this.camera.position.add(delta);
+          this.controls.target.add(delta);
         }
         dispose() {
           if (this.animationId) {
             cancelAnimationFrame(this.animationId);
           }
+          if (this._onKeyDown) window.removeEventListener("keydown", this._onKeyDown);
+          if (this._onKeyUp) window.removeEventListener("keyup", this._onKeyUp);
           if (this.renderer) {
             this.renderer.dispose();
           }
@@ -45581,713 +45087,14 @@ void main() {
     }
   });
 
-  // src/models/WindTransportModel.js
-  var WindTransportModel_exports = {};
-  __export(WindTransportModel_exports, {
-    WindTransportModel: () => WindTransportModel
-  });
-  var SimplexNoise, WindTransportModel;
-  var init_WindTransportModel = __esm({
-    "src/models/WindTransportModel.js"() {
-      init_three_module();
-      init_OrbitControls();
-      init_CSS2DRenderer();
-      SimplexNoise = class {
-        constructor(seed = Math.random()) {
-          this.p = new Uint8Array(256);
-          this.perm = new Uint8Array(512);
-          this.permMod12 = new Uint8Array(512);
-          for (let i = 0; i < 256; i++) {
-            this.p[i] = i;
-          }
-          let n, q;
-          for (let i = 255; i > 0; i--) {
-            seed = seed * 16807 % 2147483647;
-            n = seed % (i + 1);
-            q = this.p[i];
-            this.p[i] = this.p[n];
-            this.p[n] = q;
-          }
-          for (let i = 0; i < 512; i++) {
-            this.perm[i] = this.p[i & 255];
-            this.permMod12[i] = this.perm[i] % 12;
-          }
-          this.grad3 = new Float32Array([
-            1,
-            1,
-            0,
-            -1,
-            1,
-            0,
-            1,
-            -1,
-            0,
-            -1,
-            -1,
-            0,
-            1,
-            0,
-            1,
-            -1,
-            0,
-            1,
-            1,
-            0,
-            -1,
-            -1,
-            0,
-            -1,
-            0,
-            1,
-            1,
-            0,
-            -1,
-            1,
-            0,
-            1,
-            -1,
-            0,
-            -1,
-            -1
-          ]);
-          this.F2 = 0.5 * (Math.sqrt(3) - 1);
-          this.G2 = (3 - Math.sqrt(3)) / 6;
-        }
-        noise2D(xin, yin) {
-          let n0, n1, n2;
-          const s = (xin + yin) * this.F2;
-          const i = Math.floor(xin + s);
-          const j = Math.floor(yin + s);
-          const t = (i + j) * this.G2;
-          const X0 = i - t;
-          const Y0 = j - t;
-          const x0 = xin - X0;
-          const y0 = yin - Y0;
-          let i1, j1;
-          if (x0 > y0) {
-            i1 = 1;
-            j1 = 0;
-          } else {
-            i1 = 0;
-            j1 = 1;
-          }
-          const x1 = x0 - i1 + this.G2;
-          const y1 = y0 - j1 + this.G2;
-          const x2 = x0 - 1 + 2 * this.G2;
-          const y2 = y0 - 1 + 2 * this.G2;
-          const ii = i & 255;
-          const jj = j & 255;
-          let t0 = 0.5 - x0 * x0 - y0 * y0;
-          if (t0 < 0) {
-            n0 = 0;
-          } else {
-            t0 *= t0;
-            const gi0 = this.permMod12[ii + this.perm[jj]] * 3;
-            n0 = t0 * t0 * (this.grad3[gi0] * x0 + this.grad3[gi0 + 1] * y0);
-          }
-          let t1 = 0.5 - x1 * x1 - y1 * y1;
-          if (t1 < 0) {
-            n1 = 0;
-          } else {
-            t1 *= t1;
-            const gi1 = this.permMod12[ii + i1 + this.perm[jj + j1]] * 3;
-            n1 = t1 * t1 * (this.grad3[gi1] * x1 + this.grad3[gi1 + 1] * y1);
-          }
-          let t2 = 0.5 - x2 * x2 - y2 * y2;
-          if (t2 < 0) {
-            n2 = 0;
-          } else {
-            t2 *= t2;
-            const gi2 = this.permMod12[ii + 1 + this.perm[jj + 1]] * 3;
-            n2 = t2 * t2 * (this.grad3[gi2] * x2 + this.grad3[gi2 + 1] * y2);
-          }
-          return 70 * (n0 + n1 + n2);
-        }
-      };
-      WindTransportModel = class {
-        constructor(container) {
-          this.container = container;
-          this.state = {
-            windDirection: 0,
-            windStrength: 5,
-            isPlaying: false,
-            windSpeedMultiplier: 1
-          };
-          this.animationId = null;
-          this.prevTime = performance.now();
-          this.simplex = new SimplexNoise();
-          this.clock = new Clock();
-          this.dunes = [];
-          this.windParticles = [];
-          this.init();
-        }
-        init() {
-          this.createUI();
-          setTimeout(() => {
-            try {
-              this.setupRenderer();
-              this.setupScene();
-              this.setupCamera();
-              this.setupLights();
-              this.createGround();
-              this.createBarchanDune(-25, 0, -5);
-              this.createParabolicDune(25, 0, 8);
-              this.createWindParticles();
-              this.createLabels();
-              this.bindEvents();
-              this.animate();
-            } catch (e) {
-              console.error("WindTransportModel init error:", e);
-              alert("\u6A21\u578B\u521D\u59CB\u5316\u51FA\u9519: " + e.message);
-            }
-          }, 100);
-          setTimeout(() => {
-            const overlay = document.getElementById("loading-overlay");
-            if (overlay) overlay.classList.add("hidden");
-          }, 500);
-        }
-        createUI() {
-          this.container.innerHTML = `
-<div class="app">
-<style>#windCanvas{width:100%;height:100%}</style>
-<header class="header">
-    <div class="scan-line"></div>
-    <div class="header-left">
-        <div class="header-logo">\u{1F3DC}</div>
-        <div class="title-block">
-            <div class="title-main">\u98CE\u529B\u642C\u8FD0\u4F5C\u7528</div>
-            <div class="title-sub">WIND TRANSPORTATION \u2014 GEOGRAPHIC DUNE MODEL</div>
-        </div>
-    </div>
-    <div class="header-center">
-        <div class="header-badge active">\u25B6 \u65B0\u6708\u5F62\u6C99\u4E18 \xB7 \u629B\u7269\u7EBF\u6C99\u4E18</div>
-    </div>
-    <div class="header-right">
-        <button id="backToMenuBtn">\u{1F3E0} \u8FD4\u56DE\u83DC\u5355</button>
-        <div class="status-group"><div class="status-dot"></div><div class="status-label">ONLINE</div></div>
-    </div>
-</header>
-
-<aside class="side-panel left-panel">
-    <div class="panel-block orange-accent">
-        <div class="block-title orange">\u5B9E\u65F6\u6570\u636E</div>
-        <div class="data-row"><span class="data-key">\u98CE\u901F</span><span class="data-val" id="windSpeedVal">5.0 m/s</span></div>
-        <div class="data-row"><span class="data-key">\u98CE\u5411</span><span class="data-val cyan" id="windDirVal">\u4E1C\u98CE (0\xB0)</span></div>
-        <div class="data-row"><span class="data-key">\u6C99\u4E18\u72B6\u6001</span><span class="data-val yellow" id="duneStatus">\u9759\u6B62</span></div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u5730\u7406\u6807\u6CE8</div>
-        <div style="font-size:10px;color:var(--text2);line-height:1.8;padding:8px 0">
-            <div>\u{1F319} <strong>\u65B0\u6708\u5F62\u6C99\u4E18</strong>\uFF08\u5DE6\u4FA7\uFF09</div>
-            <div>\u3030\uFE0F <strong>\u629B\u7269\u7EBF\u6C99\u4E18</strong>\uFF08\u53F3\u4FA7\uFF09</div>
-            <div>\u2B05\uFE0F \u8FCE\u98CE\u5761\uFF1A\u6C99\u5B50\u88AB\u98CE\u626C\u8D77</div>
-            <div>\u27A1\uFE0F \u80CC\u98CE\u5761\uFF1A\u6C99\u5B50\u6C89\u79EF\u6ED1\u843D</div>
-            <div>\u{1F4D0} \u6C99\u4E18\u968F\u98CE\u5411\u7F13\u6162\u8FC1\u79FB</div>
-            <div>\u{1F534} \u7EA2\u8272\u7C92\u5B50\uFF1A\u98CE\u8680\u533A\u57DF</div>
-            <div>\u{1F535} \u84DD\u8272\u7C92\u5B50\uFF1A\u6C89\u79EF\u533A\u57DF</div>
-        </div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u98CE\u5411\u56FE\u793A</div>
-        <div style="text-align:center;padding:10px 0">
-            <div id="windArrow" style="font-size:48px;color:var(--cyan);text-shadow:0 0 20px var(--glow-c);transition:transform 0.3s">\u27A4</div>
-        </div>
-    </div>
-</aside>
-
-<main class="canvas-wrap">
-    <div id="windCanvas"></div>
-    <div class="corner-deco tl"></div><div class="corner-deco tr"></div>
-    <div class="corner-deco bl"></div><div class="corner-deco br"></div>
-    <div class="axis-hint">\u{1F5B1} \u62D6\u62FD\u65CB\u8F6C \xB7 \u6EDA\u8F6E\u7F29\u653E \xB7 \u53F3\u952E\u5E73\u79FB</div>
-</main>
-
-<aside class="side-panel right-panel">
-    <div class="panel-block">
-        <div class="block-title">\u98CE\u5411\u63A7\u5236</div>
-        <div class="slider-wrap">
-            <div class="slider-header"><span class="slider-label">\u98CE\u5411\u89D2\u5EA6</span><span class="slider-value-display cyan" id="dirDisplay">0\xB0</span></div>
-            <input type="range" id="dirSlider" min="0" max="360" value="0" step="1" style="--pct:0%">
-            <div class="slider-ticks"><span>\u4E1C</span><span>\u5357</span><span>\u897F</span><span>\u5317</span><span>\u4E1C</span></div>
-        </div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u98CE\u529B\u5F3A\u5EA6</div>
-        <div class="slider-wrap">
-            <div class="slider-header"><span class="slider-label">\u98CE\u901F</span><span class="slider-value-display" id="strDisplay">5.0 m/s</span></div>
-            <input type="range" id="strSlider" min="1" max="15" value="5" step="0.5" style="--pct:28%">
-        </div>
-        <div class="legend">
-            <div class="legend-item"><div class="legend-dot" style="background:var(--cyan)"></div>\u8F6F\u98CE 1-3</div>
-            <div class="legend-item"><div class="legend-dot" style="background:var(--orange)"></div>\u5FAE\u98CE 3-6</div>
-            <div class="legend-item"><div class="legend-dot" style="background:#ff2244"></div>\u5F3A\u98CE >6</div>
-        </div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u6C99\u4E18\u6F14\u5316</div>
-        <div class="btn-group">
-            <button class="btn" id="playBtn"><span class="btn-icon">\u25B6</span><span class="btn-text">\u5F00\u59CB\u6F14\u5316</span></button>
-        </div>
-        <div class="btn-group" style="margin-top:8px">
-            <button class="btn" id="resetBtn"><span class="btn-icon">\u{1F504}</span><span class="btn-text">\u91CD\u7F6E\u6C99\u4E18</span></button>
-        </div>
-    </div>
-    <div class="panel-block">
-        <div class="block-title">\u89C6\u89D2\u63A7\u5236</div>
-        <div class="btn-group">
-            <button class="btn" id="resetViewBtn"><span class="btn-icon">\u{1F3AF}</span><span class="btn-text">\u91CD\u7F6E\u89C6\u89D2</span></button>
-            <button class="btn" id="topViewBtn"><span class="btn-icon">\u{1F52D}</span><span class="btn-text">\u4FEF\u89C6\u89C6\u89D2</span></button>
-        </div>
-    </div>
-</aside>
-
-<footer class="footer">
-    <div class="footer-item"><span class="footer-label">\u98CE\u901F</span><span class="footer-value" id="ftWindSpeed">5.0 m/s</span></div>
-    <div class="footer-item"><span class="footer-label">\u98CE\u5411</span><span class="footer-value orange" id="ftWindDir">\u4E1C\u98CE</span></div>
-    <div class="footer-item"><span class="footer-label">\u6F14\u5316\u72B6\u6001</span><span class="footer-value cyan" id="ftStatus">\u9759\u6B62</span></div>
-    <div class="footer-item"><span class="footer-label">\u5E27\u7387</span><span class="footer-value green" id="fps">\u2014</span></div>
-</footer>
-</div>`;
-        }
-        setupRenderer() {
-          const canvasWrap = this.container.querySelector(".canvas-wrap");
-          const canvasContainer = this.container.querySelector("#windCanvas");
-          this.width = canvasWrap.offsetWidth || 800;
-          this.height = canvasWrap.offsetHeight || 600;
-          if (this.width < 10) {
-            this.width = window.innerWidth * 0.6;
-            this.height = window.innerHeight * 0.7;
-          }
-          this.canvas = document.createElement("canvas");
-          this.canvas.style.width = "100%";
-          this.canvas.style.height = "100%";
-          canvasContainer.appendChild(this.canvas);
-          this.renderer = new WebGLRenderer({ canvas: this.canvas, antialias: true });
-          this.renderer.setSize(this.width, this.height);
-          this.renderer.setPixelRatio(Math.min(window.devicePixelRatio, 2));
-          this.renderer.shadowMap.enabled = true;
-          this.renderer.toneMapping = ACESFilmicToneMapping;
-          this.labelRenderer = new CSS2DRenderer();
-          this.labelRenderer.setSize(this.width, this.height);
-          this.labelRenderer.domElement.style.position = "absolute";
-          this.labelRenderer.domElement.style.top = "0";
-          this.labelRenderer.domElement.style.pointerEvents = "none";
-          canvasContainer.appendChild(this.labelRenderer.domElement);
-        }
-        setupScene() {
-          this.scene = new Scene();
-          this.scene.background = new Color(15263976);
-          this.scene.fog = new Fog(15263976, 80, 250);
-        }
-        setupCamera() {
-          this.defaultCamPos = new Vector3(55, 45, 65);
-          this.defaultCamTarget = new Vector3(0, 4, 0);
-          this.camera = new PerspectiveCamera(50, this.width / this.height, 0.1, 500);
-          this.camera.position.copy(this.defaultCamPos);
-          this.camera.lookAt(this.defaultCamTarget);
-          this.controls = new OrbitControls(this.camera, this.renderer.domElement);
-          this.controls.enableDamping = true;
-          this.controls.dampingFactor = 0.06;
-          this.controls.target.copy(this.defaultCamTarget);
-          this.controls.minDistance = 25;
-          this.controls.maxDistance = 180;
-          this.controls.update();
-        }
-        setupLights() {
-          this.scene.add(new AmbientLight(16777215, 0.6));
-          const sun = new DirectionalLight(16777215, 0.8);
-          sun.position.set(50, 80, 30);
-          sun.castShadow = true;
-          sun.shadow.mapSize.set(1024, 1024);
-          sun.shadow.camera.near = 5;
-          sun.shadow.camera.far = 200;
-          sun.shadow.camera.left = -80;
-          sun.shadow.camera.right = 80;
-          sun.shadow.camera.top = 80;
-          sun.shadow.camera.bottom = -80;
-          this.scene.add(sun);
-        }
-        createGround() {
-          const geometry = new PlaneGeometry(120, 100, 60, 50);
-          const positions = geometry.attributes.position.array;
-          for (let i = 0; i < positions.length; i += 3) {
-            const x = positions[i];
-            const y = positions[i + 1];
-            positions[i + 2] = this.simplex.noise2D(x * 0.05, y * 0.05) * 0.3;
-          }
-          geometry.computeVertexNormals();
-          const material = new MeshStandardMaterial({
-            color: 13935988,
-            roughness: 0.9,
-            metalness: 0
-          });
-          this.ground = new Mesh(geometry, material);
-          this.ground.rotation.x = -Math.PI / 2;
-          this.ground.position.y = -1.5;
-          this.ground.receiveShadow = true;
-          this.scene.add(this.ground);
-        }
-        createBarchanDune(x, y, z) {
-          const group = new Group();
-          const segments = 50;
-          const geometry = new BufferGeometry();
-          const vertices = [];
-          const indices = [];
-          for (let i = 0; i <= segments; i++) {
-            const angle = i / segments * Math.PI * 2;
-            for (let j = 0; j <= segments; j++) {
-              const radius = j / segments * 16;
-              const px2 = Math.cos(angle) * radius;
-              const pz2 = Math.sin(angle) * radius;
-              let py2 = 0;
-              const dist = Math.sqrt(px2 * px2 + pz2 * pz2);
-              if (dist < 16) {
-                const normalizedDist = dist / 16;
-                if (px2 < 0) {
-                  py2 = Math.cos(normalizedDist * Math.PI * 0.5) * 9;
-                } else {
-                  py2 = Math.pow(1 - normalizedDist, 1.5) * 9;
-                }
-                if (px2 > 0 && pz2 > -2 && pz2 < 2) {
-                  const slipDist = dist / 16;
-                  py2 = Math.max(py2 - slipDist * 3, 0);
-                }
-                py2 += this.simplex.noise2D(px2 * 0.3, pz2 * 0.3) * 0.3;
-              }
-              vertices.push(px2, Math.max(py2, 0), pz2);
-            }
-          }
-          for (let i = 0; i < segments; i++) {
-            for (let j = 0; j < segments; j++) {
-              const a = i * (segments + 1) + j;
-              const b = a + 1;
-              const c = a + segments + 1;
-              const d = c + 1;
-              indices.push(a, c, b);
-              indices.push(b, c, d);
-            }
-          }
-          geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
-          geometry.setIndex(indices);
-          geometry.computeVertexNormals();
-          const material = new MeshStandardMaterial({
-            color: 13213803,
-            roughness: 0.95,
-            metalness: 0
-          });
-          const dune = new Mesh(geometry, material);
-          dune.castShadow = true;
-          dune.receiveShadow = true;
-          dune.userData.originalPositions = vertices.slice();
-          dune.userData.type = "barchan";
-          group.add(dune);
-          group.position.set(x, y, z);
-          this.scene.add(group);
-          this.dunes.push(group);
-        }
-        createParabolicDune(x, y, z) {
-          const group = new Group();
-          const segments = 50;
-          const geometry = new BufferGeometry();
-          const vertices = [];
-          const indices = [];
-          for (let i = 0; i <= segments; i++) {
-            const angle = i / segments * Math.PI * 2;
-            for (let j = 0; j <= segments; j++) {
-              const radius = j / segments * 16;
-              const px2 = Math.cos(angle) * radius;
-              const pz2 = Math.sin(angle) * radius;
-              let py2 = 0;
-              const dist = Math.sqrt(px2 * px2 + pz2 * pz2);
-              if (dist < 16) {
-                const normalizedDist = dist / 16;
-                if (px2 < 0) {
-                  if (Math.abs(pz2) > 5) {
-                    py2 = Math.cos(normalizedDist * Math.PI * 0.5) * 7;
-                  }
-                } else {
-                  py2 = Math.pow(1 - normalizedDist, 1.2) * 7;
-                }
-                py2 += this.simplex.noise2D(px2 * 0.3, pz2 * 0.3) * 0.25;
-              }
-              vertices.push(px2, Math.max(py2, 0), pz2);
-            }
-          }
-          for (let i = 0; i < segments; i++) {
-            for (let j = 0; j < segments; j++) {
-              const a = i * (segments + 1) + j;
-              const b = a + 1;
-              const c = a + segments + 1;
-              const d = c + 1;
-              indices.push(a, c, b);
-              indices.push(b, c, d);
-            }
-          }
-          geometry.setAttribute("position", new Float32BufferAttribute(vertices, 3));
-          geometry.setIndex(indices);
-          geometry.computeVertexNormals();
-          const material = new MeshStandardMaterial({
-            color: 13935988,
-            roughness: 0.95,
-            metalness: 0
-          });
-          const dune = new Mesh(geometry, material);
-          dune.castShadow = true;
-          dune.receiveShadow = true;
-          dune.userData.originalPositions = vertices.slice();
-          dune.userData.type = "parabolic";
-          group.add(dune);
-          group.position.set(x, y, z);
-          this.scene.add(group);
-          this.dunes.push(group);
-        }
-        createWindParticles() {
-          const particleCount = 500;
-          const geometry = new BufferGeometry();
-          const positions = new Float32Array(particleCount * 3);
-          const colors = new Float32Array(particleCount * 3);
-          const velocities = [];
-          for (let i = 0; i < particleCount; i++) {
-            const x = (Math.random() - 0.5) * 100;
-            const y = Math.random() * 15;
-            const z = (Math.random() - 0.5) * 80;
-            positions[i * 3] = x;
-            positions[i * 3 + 1] = y;
-            positions[i * 3 + 2] = z;
-            const isErosion = x < -10;
-            colors[i * 3] = isErosion ? 1 : 0.27;
-            colors[i * 3 + 1] = isErosion ? 0.27 : 0.27;
-            colors[i * 3 + 2] = isErosion ? 0.27 : 1;
-            velocities.push({
-              x: Math.random() * 0.5 + 0.5,
-              y: (Math.random() - 0.5) * 0.2,
-              z: (Math.random() - 0.5) * 0.3
-            });
-          }
-          geometry.setAttribute("position", new BufferAttribute(positions, 3));
-          geometry.setAttribute("color", new BufferAttribute(colors, 3));
-          const material = new PointsMaterial({
-            size: 0.35,
-            vertexColors: true,
-            transparent: true,
-            opacity: 0.95
-          });
-          const particles = new Points(geometry, material);
-          particles.userData.velocities = velocities;
-          this.scene.add(particles);
-          this.windParticles.push(particles);
-        }
-        createLabels() {
-          this.createLabel("\u8FCE\u98CE\u5761", -35, 8, -5);
-          this.createLabel("\u80CC\u98CE\u5761", -15, 7, -5);
-          this.createLabel("\u6ED1\u843D\u9762", -18, 5, -2);
-          this.createLabel("\u98CE\u5411 \u2192", -50, 8, -5);
-          this.createLabel("\u6C99\u7C92\u6C89\u79EF\u533A", 0, 5, -5);
-          this.createLabel("\u65B0\u6708\u5F62\u6C99\u4E18", -25, 14, -15);
-          this.createLabel("\u629B\u7269\u7EBF\u6C99\u4E18", 25, 12, 5);
-        }
-        createLabel(text, x, y, z) {
-          const div = document.createElement("div");
-          div.className = "label";
-          div.style.position = "absolute";
-          div.style.background = "rgba(255, 255, 255, 0.9)";
-          div.style.padding = "4px 8px";
-          div.style.borderRadius = "4px";
-          div.style.fontSize = "12px";
-          div.style.color = "#333";
-          div.style.pointerEvents = "none";
-          div.style.boxShadow = "0 2px 6px rgba(0, 0, 0, 0.15)";
-          div.style.whiteSpace = "nowrap";
-          div.style.fontWeight = "500";
-          div.textContent = text;
-          const label = new CSS2DObject(div);
-          label.position.set(x, y, z);
-          this.scene.add(label);
-        }
-        updateWindParticles(dt) {
-          this.windParticles.forEach((particles) => {
-            const positions = particles.geometry.attributes.position.array;
-            const velocities = particles.userData.velocities;
-            for (let i = 0; i < velocities.length; i++) {
-              positions[i * 3] += velocities[i].x * this.state.windSpeedMultiplier * dt * 10;
-              positions[i * 3 + 1] += velocities[i].y * this.state.windSpeedMultiplier * dt * 10;
-              positions[i * 3 + 2] += velocities[i].z * this.state.windSpeedMultiplier * dt * 10;
-              if (positions[i * 3] > 60) {
-                positions[i * 3] = -60;
-                positions[i * 3 + 1] = Math.random() * 15;
-                positions[i * 3 + 2] = (Math.random() - 0.5) * 80;
-              }
-            }
-            particles.geometry.attributes.position.needsUpdate = true;
-          });
-        }
-        evolveDunes(time) {
-          this.dunes.forEach((group, groupIndex) => {
-            const dune = group.children[0];
-            const originalPositions = dune.userData.originalPositions;
-            const positions = dune.geometry.attributes.position.array;
-            for (let i = 0; i < positions.length; i += 3) {
-              const ox = originalPositions[i];
-              const oy = originalPositions[i + 1];
-              const oz = originalPositions[i + 2];
-              const evolution = Math.sin(time * 0.5 + groupIndex) * 0.3;
-              const moveX = evolution * (ox > 0 ? 1 : 0.3);
-              positions[i] = ox + moveX;
-              positions[i + 1] = oy + evolution * 0.2;
-              positions[i + 2] = oz;
-            }
-            dune.geometry.attributes.position.needsUpdate = true;
-            dune.geometry.computeVertexNormals();
-          });
-        }
-        bindEvents() {
-          this.container.querySelector("#backToMenuBtn")?.addEventListener("click", () => {
-            Promise.resolve().then(() => (init_app_init(), app_init_exports)).then((m) => m.showWelcome());
-          });
-          this.container.querySelector("#dirSlider")?.addEventListener("input", (e) => {
-            this.state.windDirection = parseFloat(e.target.value);
-            this.syncUI();
-          });
-          this.container.querySelector("#strSlider")?.addEventListener("input", (e) => {
-            this.state.windStrength = parseFloat(e.target.value);
-            this.state.windSpeedMultiplier = this.state.windStrength / 5;
-            this.syncUI();
-          });
-          this.container.querySelector("#playBtn")?.addEventListener("click", () => {
-            this.state.isPlaying = !this.state.isPlaying;
-            const btn = this.container.querySelector("#playBtn");
-            if (btn) {
-              btn.querySelector(".btn-icon").textContent = this.state.isPlaying ? "\u23F8" : "\u25B6";
-              btn.querySelector(".btn-text").textContent = this.state.isPlaying ? "\u6682\u505C\u6F14\u5316" : "\u5F00\u59CB\u6F14\u5316";
-            }
-            const duneStatus = this.container.querySelector("#duneStatus");
-            if (duneStatus) duneStatus.textContent = this.state.isPlaying ? "\u6F14\u5316\u4E2D" : "\u9759\u6B62";
-            const ftStatus = this.container.querySelector("#ftStatus");
-            if (ftStatus) ftStatus.textContent = this.state.isPlaying ? "\u6F14\u5316\u4E2D" : "\u9759\u6B62";
-          });
-          this.container.querySelector("#resetBtn")?.addEventListener("click", () => this.resetDunes());
-          this.container.querySelector("#resetViewBtn")?.addEventListener("click", () => {
-            this.camera.position.copy(this.defaultCamPos);
-            this.controls.target.copy(this.defaultCamTarget);
-            this.controls.update();
-          });
-          this.container.querySelector("#topViewBtn")?.addEventListener("click", () => {
-            this.camera.position.set(0, 100, 0);
-            this.controls.target.set(0, 0, 0);
-            this.controls.update();
-          });
-          window.addEventListener("resize", () => this.onResize());
-        }
-        syncUI() {
-          const dirSlider = this.container.querySelector("#dirSlider");
-          const strSlider = this.container.querySelector("#strSlider");
-          if (dirSlider) {
-            dirSlider.value = this.state.windDirection;
-            dirSlider.style.setProperty("--pct", this.state.windDirection / 360 * 100 + "%");
-          }
-          if (strSlider) {
-            strSlider.value = this.state.windStrength;
-            strSlider.style.setProperty("--pct", (this.state.windStrength - 1) / 14 * 100 + "%");
-          }
-          const dirs = ["\u4E1C\u98CE", "\u4E1C\u5357\u98CE", "\u5357\u98CE", "\u897F\u5357\u98CE", "\u897F\u98CE", "\u897F\u5317\u98CE", "\u5317\u98CE", "\u4E1C\u5317\u98CE"];
-          const di = Math.round(this.state.windDirection / 45) % 8;
-          const el = (id, v) => {
-            const e = this.container.querySelector(id);
-            if (e) e.textContent = v;
-          };
-          el("#dirDisplay", Math.round(this.state.windDirection) + "\xB0");
-          el("#strDisplay", this.state.windStrength.toFixed(1) + " m/s");
-          el("#windSpeedVal", this.state.windStrength.toFixed(1) + " m/s");
-          el("#windDirVal", dirs[di] + " (" + Math.round(this.state.windDirection) + "\xB0)");
-          el("#ftWindSpeed", this.state.windStrength.toFixed(1) + " m/s");
-          el("#ftWindDir", dirs[di]);
-          const arrow = this.container.querySelector("#windArrow");
-          if (arrow) arrow.style.transform = "rotate(" + this.state.windDirection + "deg)";
-        }
-        resetDunes() {
-          this.state.isPlaying = false;
-          const btn = this.container.querySelector("#playBtn");
-          if (btn) {
-            btn.querySelector(".btn-icon").textContent = "\u25B6";
-            btn.querySelector(".btn-text").textContent = "\u5F00\u59CB\u6F14\u5316";
-          }
-          const duneStatus = this.container.querySelector("#duneStatus");
-          if (duneStatus) duneStatus.textContent = "\u9759\u6B62";
-          const ftStatus = this.container.querySelector("#ftStatus");
-          if (ftStatus) ftStatus.textContent = "\u9759\u6B62";
-          this.dunes.forEach((group) => {
-            const dune = group.children[0];
-            const positions = dune.geometry.attributes.position.array;
-            const originalPositions = dune.userData.originalPositions;
-            for (let i = 0; i < positions.length; i++) {
-              positions[i] = originalPositions[i];
-            }
-            dune.geometry.attributes.position.needsUpdate = true;
-            dune.geometry.computeVertexNormals();
-          });
-        }
-        onResize() {
-          const wrap = this.container.querySelector(".canvas-wrap");
-          if (!wrap) return;
-          this.width = wrap.offsetWidth || 800;
-          this.height = wrap.offsetHeight || 600;
-          this.camera.aspect = this.width / this.height;
-          this.camera.updateProjectionMatrix();
-          this.renderer.setSize(this.width, this.height);
-          this.labelRenderer.setSize(this.width, this.height);
-        }
-        animate() {
-          this.animationId = requestAnimationFrame(() => this.animate());
-          const now = performance.now();
-          const dt = Math.min((now - this.prevTime) / 1e3, 0.05);
-          this.prevTime = now;
-          const time = this.clock.getElapsedTime();
-          this.updateWindParticles(dt);
-          if (this.state.isPlaying) {
-            this.evolveDunes(time);
-          }
-          this.controls.update();
-          this.renderer.render(this.scene, this.camera);
-          this.labelRenderer.render(this.scene, this.camera);
-          if (Math.random() < 0.1) {
-            const el = this.container.querySelector("#fps");
-            if (el) el.textContent = Math.round(1 / dt) + " fps";
-          }
-        }
-        dispose() {
-          if (this.animationId) cancelAnimationFrame(this.animationId);
-          if (this.renderer) this.renderer.dispose();
-          if (this.labelRenderer) this.labelRenderer.domElement.remove();
-          if (this.scene) {
-            this.scene.traverse((obj) => {
-              if (obj.geometry) obj.geometry.dispose();
-              if (obj.material) {
-                if (Array.isArray(obj.material)) obj.material.forEach((m) => m.dispose());
-                else obj.material.dispose();
-              }
-            });
-          }
-        }
-      };
-    }
-  });
-
   // src/app-init.js
-  var app_init_exports = {};
-  __export(app_init_exports, {
-    initApp: () => initApp,
-    showWelcome: () => showWelcome
-  });
   function initApp() {
     startLoadingSteps();
-    bindModelCards();
-    watchLoadingOverlay();
     setTimeout(() => {
       const overlay = document.getElementById("loading-overlay");
-      const welcomeScreen = document.getElementById("welcome-screen");
       if (overlay) overlay.classList.add("hidden");
-      if (welcomeScreen) welcomeScreen.classList.add("visible");
-    }, 2e3);
+      loadTectonicModel();
+    }, 1200);
   }
   function startLoadingSteps() {
     const steps = [
@@ -46304,65 +45111,18 @@ void main() {
       idx = (idx + 1) % steps.length;
       if (stepsEl) stepsEl.textContent = steps[idx];
       if (idx === steps.length - 1) clearInterval(interval);
-    }, 380);
+    }, 200);
   }
-  function bindModelCards() {
-    document.querySelectorAll(".model-card").forEach((card) => {
-      card.addEventListener("click", async () => {
-        const modelType = card.dataset.model;
-        await loadModel(modelType);
-      });
-    });
-  }
-  async function loadModel(modelType) {
-    const welcomeScreen = document.getElementById("welcome-screen");
+  async function loadTectonicModel() {
     const modelContainer = document.getElementById("model-container");
-    welcomeScreen.classList.remove("visible");
+    if (!modelContainer) return;
     modelContainer.style.display = "block";
-    if (currentModel && currentModel.dispose) {
-      currentModel.dispose();
-    }
     modelContainer.innerHTML = "";
-    if (modelType === "tectonic") {
-      const { TectonicModel: TectonicModel2 } = await Promise.resolve().then(() => (init_TectonicModel(), TectonicModel_exports));
-      currentModel = new TectonicModel2(modelContainer);
-    } else if (modelType === "wind") {
-      const { WindTransportModel: WindTransportModel2 } = await Promise.resolve().then(() => (init_WindTransportModel(), WindTransportModel_exports));
-      currentModel = new WindTransportModel2(modelContainer);
-    }
+    const { TectonicModel: TectonicModel2 } = await Promise.resolve().then(() => (init_TectonicModel(), TectonicModel_exports));
+    new TectonicModel2(modelContainer);
     setTimeout(() => window.dispatchEvent(new Event("resize")), 60);
   }
-  function watchLoadingOverlay() {
-    const overlay = document.getElementById("loading-overlay");
-    if (!overlay) return;
-    let triggered = false;
-    const obs = new MutationObserver(() => {
-      if (!triggered && overlay.classList.contains("hidden")) {
-        triggered = true;
-        obs.disconnect();
-      }
-    });
-    obs.observe(overlay, { attributes: true, attributeFilter: ["class"] });
-  }
-  function showWelcome() {
-    const welcomeScreen = document.getElementById("welcome-screen");
-    const modelContainer = document.getElementById("model-container");
-    if (currentModel && currentModel.dispose) {
-      currentModel.dispose();
-      currentModel = null;
-    }
-    modelContainer.style.display = "none";
-    modelContainer.innerHTML = "";
-    welcomeScreen.classList.add("visible");
-  }
-  var currentModel;
-  var init_app_init = __esm({
-    "src/app-init.js"() {
-      currentModel = null;
-    }
-  });
 
   // build-entry.js
-  init_app_init();
   initApp();
 })();

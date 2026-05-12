@@ -24,25 +24,21 @@
     --glow-g: rgba(0,255,136,0.35);
     --font: 'Courier New', 'Consolas', 'SF Mono', monospace;
     --font2: 'Arial', 'Microsoft YaHei', sans-serif;
-    --panel-w: 275px;
-    --right-w: 310px;
+    --right-w: 240px;
     --header-h: 74px;
-    --footer-h: 52px;
 }
 
 *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
 html, body { width:100%; height:100%; overflow:hidden; background: var(--bg0); }
 body { font-family: var(--font); color: var(--text1); }
+#model-container { width: 100%; height: 100%; }
 
 /* 响应式断点 */
-@media (max-width: 1450px) {
-    :root { --panel-w: 245px; --right-w: 275px; }
-}
 @media (max-width: 1200px) {
-    :root { --panel-w: 215px; --right-w: 250px; }
+    :root { --right-w: 210px; }
 }
-@media (max-width: 1000px) {
+@media (max-width: 900px) {
     .app { grid-template-columns: 1fr; }
-    .left-panel, .right-panel { display: none; }
+    .right-panel { display: none; }
     .canvas-wrap { grid-column: 1; }
 }
