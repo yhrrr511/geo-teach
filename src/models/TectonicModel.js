@@ -66,71 +66,7 @@ export class TectonicModel {
 <style>
 #tectonicCanvas { width: 100%; height: 100%; }
 
-/* ── 地层标签样式 ── */
-.geo-teach-label {
-    pointer-events: none;
-    /* 标签向左展开，锚点在标签最右端（即箭头尖端处） */
-    transform: translateX(-100%) translateY(-50%);
-    white-space: nowrap;
-    position: relative;
-    display: inline-block;
-}
-.geo-teach-label__box {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 10px 5px 10px;
-    background: rgba(4, 10, 22, 0.88);
-    border: 1px solid var(--label-border, #aaa);
-    border-left: 3px solid var(--label-border, #aaa);
-    border-radius: 3px;
-    font-family: 'Courier New', 'Consolas', monospace;
-    font-size: 11.5px;
-    letter-spacing: 0.06em;
-    color: #e8eef8;
-    box-shadow: 0 0 12px var(--label-glow, rgba(200,200,200,0.2)),
-                inset 0 0 6px rgba(255,255,255,0.02);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
-}
-/* 箭头：标签右侧指向右方（指向场景内） */
-.geo-teach-label__arrow {
-    display: inline-block;
-    width: 32px;
-    height: 2px;
-    background: linear-gradient(90deg, var(--label-border, #aaa), transparent);
-    position: relative;
-    vertical-align: middle;
-    flex-shrink: 0;
-    margin-left: 2px;
-}
-.geo-teach-label__arrow::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    border-left: 7px solid var(--label-border, #aaa);
-    border-top: 5px solid transparent;
-    border-bottom: 5px solid transparent;
-}
-/* 终点光点 */
-.geo-teach-label__dot {
-    position: absolute;
-    right: -5px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--label-border, #aaa);
-    box-shadow: 0 0 6px var(--label-glow, rgba(200,200,200,0.4));
-    animation: geoDotPulse 2.2s ease-in-out infinite;
-}
-@keyframes geoDotPulse {
-    0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
-    50%       { opacity: 0.5; transform: translateY(-50%) scale(1.6); }
-}
+/* 地层标签面板已移入 3D 场景，HTML 层无需样式 */
 </style>
 <header class="header">
     <div class="scan-line"></div>
@@ -154,7 +90,8 @@ export class TectonicModel {
 
 
 <main class="canvas-wrap">
-    <div id="tectonicCanvas"></div>
+    <div id="tectonicCanvas">
+    </div>
     <div class="corner-deco tl"></div>
     <div class="corner-deco tr"></div>
     <div class="corner-deco bl"></div>
@@ -292,65 +229,193 @@ export class TectonicModel {
 
         // 初始化静态场景
         this.tectonicModel.update(0.5, 1.0, 'static');
+
     }
 
+    // ── 在正剖面平面（Z=56）内用 Canvas 贴图创建 3D 标签 ──────────
     setupLabels() {
-        const themes = {
-            ocean:    { border: '#7fdcff', glow: 'rgba(88, 210, 255, 0.35)' },
-            land:     { border: '#f1f6ff', glow: 'rgba(255, 255, 255, 0.2)' },
-            gas:      { border: '#a0a0a0', glow: 'rgba(160, 160, 160, 0.45)' },
-            oil:      { border: '#555555', glow: 'rgba(80, 80, 80, 0.50)' },
-            water:    { border: '#2255cc', glow: 'rgba(30, 80, 200, 0.45)' },
-            rock:     { border: '#a08878', glow: 'rgba(160, 130, 100, 0.30)' },
-        };
+        const FZ = 56; // 正剖面 Z
 
-        const addLabel = (text, themeName, position) => {
-            const root = document.createElement('div');
-            root.className = 'geo-teach-label';
-            root.style.setProperty('--label-border', themes[themeName].border);
-            root.style.setProperty('--label-glow', themes[themeName].glow);
-            root.innerHTML = `<div class="geo-teach-label__box">${text}<span class="geo-teach-label__arrow"></span></div><div class="geo-teach-label__dot"></div>`;
-            const obj = new CSS2DObject(root);
-            obj.position.copy(position);
-            this.scene.add(obj);
-            return obj;
-        };
+        // ──── 地层标签（贴在正剖面内，随剖面旋转消失） ────
+        // 标签文字框 X 内心 = -45（宽32，左边到 -61，右边到 -29）
+        // 横线从标签右边 X=-29 延伸到终点 X=35（避开相管35的油井和 x=55 的管子）
+        // 各层中心 Y:
+        //   含气层  Y: -34 ~ -25 → center -29.5
+        //   含油层  Y: -44 ~ -34 → center -39
+        //   地层水  Y: -55 ~ -44 → center -49.5
+        //   防水层  Y: -80 ~ -63 → center -71
+        const labelDefs = [
+            { text: '含气层 Gas',        borderColor: '#888888', y: -29.5 },
+            { text: '含油层 Oil',        borderColor: '#887744', y: -39   },
+            { text: '地层水 Water',      borderColor: '#2255bb', y: -49.5 },
+            { text: '防水层 Waterproof', borderColor: '#775544', y: -71   },
+        ];
 
-        // 获取地层锚点
-        const anchors = this.tectonicModel.getAnchors ? this.tectonicModel.getAnchors() : {};
+        this._strataSprites = [];
 
-        // ── 标签锚点策略 ──
-        // 标签锚点 X 选在左拱顶中心附近（x ≈ -20），此处拱起最明显、层厚最大
-        // 标签本身向左偏移放置，CSS2DObject 默认以 position 为锚点渲染
-        // 各层 Y 取该 x 处的实际层中心（考虑拱起 arch ≈ 16 at x=-20）
-        //   arch(-20) = gaussian(-20, -20, 30)*16 + small = ~16
-        //   reservoirTopAt(-20) ≈ clamp(-28+16, -49, -17) = -17（受capRockTop-2限制→-17）
-        //   waterproofTopAt(-20) ≈ clamp(-50+16*0.65, -64.5, -35) = -39.6
-        //   reservoirBottom(-20) = waterproofTopAt(-20) ≈ -40
-        //   waterOilBoundAt(-20): bottom=-40, top=-17, thickness=23, bound= -40+23*0.35 = -31.95
-        //   oilGasBoundAt(-20):   bottom=-40, top=-17, thickness=23, bound= -40+23*0.70 = -23.9
-        //
-        //   气层中心: (-17 + -23.9)/2 ≈ -20.5
-        //   油层中心: (-23.9 + -31.95)/2 ≈ -28.0
-        //   水层中心: (-31.95 + -40)/2 ≈ -36.0
-        //   不透水层中心（x=-20）: waterproofTop≈-40, waterproofBottom: clamp(-65+16*0.65)=-54.6 → 中心≈-47
-        //
-        // 标签从锚点向左展开（translateX(0%) translateY(-50%)）
-        // 把锚点打在层的右侧边缘附近，让文字自然向左延伸
-        const LX = 20;     // 锚点 X：层右侧偏右，标签向左展开
-        const LZ = S.frontZ;
-        this.labels = {
-            // 储集层三分标签（从上到下：气→油→水→不透水）
-            gasZone:    addLabel('天然气层 · Gas', 'gas',
-                            new THREE.Vector3(LX, -20.5, LZ)),
-            oilZone:    addLabel('石油层 · Oil', 'oil',
-                            new THREE.Vector3(LX, -28.0, LZ)),
-            waterZone:  addLabel('地层水 · Formation Water', 'water',
-                            new THREE.Vector3(LX, -36.0, LZ)),
-            waterproof: addLabel('不透水层 · Waterproof', 'rock',
-                            new THREE.Vector3(LX, -47.0, LZ)),
-        };
+        for (const def of labelDefs) {
+            // 文字标签（金色字），框中心 X=-15
+            const labelMesh = this._makeStrataSprite(def.text, '#ffd060', def.borderColor);
+            labelMesh.position.set(-15, def.y, FZ + 0.8);
+            labelMesh.scale.set(32, 7, 1);
+            this.scene.add(labelMesh);
+            this._strataSprites.push(labelMesh);
+
+            // 横线：从标签右边 X=1 到终点 X=45，长度=44，中心=23
+            const lineMesh = this._makeLineSprite(def.borderColor);
+            lineMesh.position.set(23, def.y, FZ + 0.8);
+            lineMesh.scale.set(44, 0.7, 1);
+            this.scene.add(lineMesh);
+            this._strataSprites.push(lineMesh);
+
+            // 终点小圆点（X=45，避开油井管子 X=55）
+            const dot = this._makeDotSprite(def.borderColor);
+            dot.position.set(45, def.y, FZ + 0.8);
+            dot.scale.set(2.5, 2.5, 1);
+            this.scene.add(dot);
+            this._strataSprites.push(dot);
+        }
+
+        // ──── 油井标签（CSS2DObject，始终面向屏幕） ────
+        this._setupWellLabels();
     }
+
+    _setupWellLabels() {
+        // 样式（内联进去避免全局污染）
+        const style = `
+            .well-label {
+                padding: 3px 10px;
+                background: rgba(10,10,24,0.82);
+                border: 1px solid #ffcc55;
+                border-left: 3px solid #ffcc55;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+                font-size: 11px;
+                color: #ffe8a0;
+                white-space: nowrap;
+                pointer-events: none;
+                backdrop-filter: blur(2px);
+            }
+        `;
+        if (!document.getElementById('well-label-style')) {
+            const styleEl = document.createElement('style');
+            styleEl.id = 'well-label-style';
+            styleEl.textContent = style;
+            document.head.appendChild(styleEl);
+        }
+
+        // 陆地油井：X=55, Z=56，地表高度约 3~5，塔射2 → 标签放在塔顶上方
+        const landEl = document.createElement('div');
+        landEl.className = 'well-label';
+        landEl.textContent = '🛢 陆地油井 Land Well';
+        const landLabel = new CSS2DObject(landEl);
+        landLabel.position.set(55, 20, 56);  // 塔架顶部上方
+        this.scene.add(landLabel);
+
+        // 海上平台：X=-65, Z=5，海面 5，平台高度约 8.85 → 标签放在平台上方
+        const offshoreEl = document.createElement('div');
+        offshoreEl.className = 'well-label';
+        offshoreEl.textContent = '🛢 海上平台 Offshore Platform';
+        const offshoreLabel = new CSS2DObject(offshoreEl);
+        offshoreLabel.position.set(-65, 26, 5);  // 平台顶部上方
+        this.scene.add(offshoreLabel);
+    }
+
+    /** 生成文字标签 Plane（Canvas 绘制，法线朝 Z+，随正剖面旋转） */
+    _makeStrataSprite(text, textColor, borderColor) {
+        const W = 256, H = 56;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+
+        // 背景（加深不透明度让文字更清晰）
+        ctx.fillStyle = 'rgba(2,6,16,0.94)';
+        this._roundRect(ctx, 0, 0, W, H, 6);
+        ctx.fill();
+
+        // 左边框彩色条
+        ctx.fillStyle = borderColor;
+        this._roundRect(ctx, 0, 0, 5, H, [6, 0, 0, 6]);
+        ctx.fill();
+
+        // 外边框（加粗加亮）
+        ctx.strokeStyle = borderColor;
+        ctx.lineWidth = 2;
+        this._roundRect(ctx, 1, 1, W - 2, H - 2, 6);
+        ctx.stroke();
+
+        // 文字（加大字号，金色）
+        ctx.font = 'bold 24px "Arial", sans-serif';
+        ctx.fillStyle = textColor;
+        ctx.textBaseline = 'middle';
+        ctx.fillText(text, 14, H / 2);
+
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.MeshBasicMaterial({
+            map: tex, transparent: true, side: THREE.FrontSide,
+            depthWrite: false, depthTest: true,
+        });
+        const geo = new THREE.PlaneGeometry(1, 1);
+        return new THREE.Mesh(geo, mat);
+    }
+
+    /** 生成横线 Plane */
+    _makeLineSprite(color) {
+        const W = 128, H = 4;
+        const canvas = document.createElement('canvas');
+        canvas.width = W; canvas.height = H;
+        const ctx = canvas.getContext('2d');
+        const grad = ctx.createLinearGradient(0, 0, W, 0);
+        grad.addColorStop(0, color + '88');
+        grad.addColorStop(0.5, color);
+        grad.addColorStop(1, color);
+        ctx.fillStyle = grad;
+        ctx.fillRect(0, 0, W, H);
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.MeshBasicMaterial({
+            map: tex, transparent: true, side: THREE.FrontSide,
+            depthWrite: false, depthTest: true,
+        });
+        const geo = new THREE.PlaneGeometry(1, 1);
+        return new THREE.Mesh(geo, mat);
+    }
+
+    /** 生成终点圆点 Plane */
+    _makeDotSprite(color) {
+        const SZ = 32;
+        const canvas = document.createElement('canvas');
+        canvas.width = SZ; canvas.height = SZ;
+        const ctx = canvas.getContext('2d');
+        ctx.beginPath();
+        ctx.arc(SZ/2, SZ/2, SZ/2 - 2, 0, Math.PI * 2);
+        ctx.fillStyle = color;
+        ctx.fill();
+        const tex = new THREE.CanvasTexture(canvas);
+        const mat = new THREE.MeshBasicMaterial({
+            map: tex, transparent: true, side: THREE.FrontSide,
+            depthWrite: false, depthTest: true,
+        });
+        const geo = new THREE.PlaneGeometry(1, 1);
+        return new THREE.Mesh(geo, mat);
+    }
+
+    /** canvas 圆角矩形辅助 */
+    _roundRect(ctx, x, y, w, h, r) {
+        if (typeof r === 'number') r = [r, r, r, r];
+        ctx.beginPath();
+        ctx.moveTo(x + r[0], y);
+        ctx.lineTo(x + w - r[1], y);
+        ctx.quadraticCurveTo(x + w, y, x + w, y + r[1]);
+        ctx.lineTo(x + w, y + h - r[2]);
+        ctx.quadraticCurveTo(x + w, y + h, x + w - r[2], y + h);
+        ctx.lineTo(x + r[3], y + h);
+        ctx.quadraticCurveTo(x, y + h, x, y + h - r[3]);
+        ctx.lineTo(x, y + r[0]);
+        ctx.quadraticCurveTo(x, y, x + r[0], y);
+        ctx.closePath();
+    }
+
+    _updateStrataLabels() { /* Sprite 跟随 3D 场景，无需每帧手动更新 */ }
 
     bindEvents() {
         this.container.querySelector('#resetViewBtn')?.addEventListener('click', () => {
@@ -430,6 +495,7 @@ export class TectonicModel {
         this.controls.update();
         this.composer.render();
         this.css2dRenderer.render(this.scene, this.camera);
+        this._updateStrataLabels();
 
     }
 

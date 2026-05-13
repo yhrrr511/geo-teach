@@ -13302,9 +13302,30 @@ var GeoTeachApp = (() => {
   });
 
   // vendor/three/src/textures/CanvasTexture.js
+  var CanvasTexture;
   var init_CanvasTexture = __esm({
     "vendor/three/src/textures/CanvasTexture.js"() {
       init_Texture();
+      CanvasTexture = class extends Texture {
+        /**
+         * Constructs a new texture.
+         *
+         * @param {HTMLCanvasElement} [canvas] - The HTML canvas element.
+         * @param {number} [mapping=Texture.DEFAULT_MAPPING] - The texture mapping.
+         * @param {number} [wrapS=ClampToEdgeWrapping] - The wrapS value.
+         * @param {number} [wrapT=ClampToEdgeWrapping] - The wrapT value.
+         * @param {number} [magFilter=LinearFilter] - The mag filter value.
+         * @param {number} [minFilter=LinearMipmapLinearFilter] - The min filter value.
+         * @param {number} [format=RGBAFormat] - The texture format.
+         * @param {number} [type=UnsignedByteType] - The texture type.
+         * @param {number} [anisotropy=Texture.DEFAULT_ANISOTROPY] - The anisotropy value.
+         */
+        constructor(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy) {
+          super(canvas, mapping, wrapS, wrapT, magFilter, minFilter, format, type, anisotropy);
+          this.isCanvasTexture = true;
+          this.needsUpdate = true;
+        }
+      };
     }
   });
 
@@ -42755,6 +42776,9 @@ void main() {
   function mix(a, b, t) {
     return a + (b - a) * t;
   }
+  function seaWaveAt(x, z) {
+    return Math.sin(x * 0.18 + z * 0.11) * 0.9 + Math.sin(x * 0.31 - z * 0.19) * 0.55 + Math.sin(x * 0.07 + z * 0.25) * 0.35 + Math.cos(x * 0.24 - z * 0.08) * 0.2;
+  }
   function smoothstep2(edge0, edge1, value) {
     if (edge0 === edge1) return value < edge0 ? 0 : 1;
     const t = clamp2((value - edge0) / (edge1 - edge0), 0, 1);
@@ -42813,14 +42837,23 @@ void main() {
     const micro = fbmNoise(z * 0.6, z * 0.25, 3, 0.18, 0.5) * 1.5;
     return clamp2(base + sBend + detail + micro, -20, 22);
   }
+  function crustBottomAt(x, z) {
+    const shore = indiaWestCoast(z);
+    const t = smoothstep2(shore, 0, x);
+    const landWave = fbmNoise(x * 0.05 + 1.3, z * 0.05 - 0.7, 3, 0.06, 0.5) * 3;
+    const oceanWave = fbmNoise(x * 0.06 - 2.1, z * 0.06 + 3.4, 3, 0.04, 0.5) * 1.5;
+    const landBot = -6 + landWave;
+    const oceanBot = -13 + oceanWave;
+    return mix(oceanBot, landBot, t);
+  }
   function oceanFloorHeight(x, z) {
     const shore = indiaWestCoast(z);
     const nx = clamp2((x - S.xMin) / (shore - S.xMin + 1e-6), 0, 1);
     const ridgeCenter = S.ridgeX + Math.sin(z * 0.078) * 2.6;
     const trenchCenter = shore - 6 + Math.sin(z * 0.11 + 0.8) * 1.6;
     const abyssalPlain = mix(-8.5, -10, smoothstep2(0.14, 0.84, nx));
-    const ridgeMass = 11.5 * gaussian(x, ridgeCenter, 7.8);
-    const ridgeShoulder = 4.5 * gaussian(x, ridgeCenter, 17);
+    const ridgeMass = 7 * gaussian(x, ridgeCenter, 7.8);
+    const ridgeShoulder = 3 * gaussian(x, ridgeCenter, 17);
     const centralBasin = -1.5 * gaussian(x, mix(S.ridgeX + 16, shore - 26, 0.55), 15);
     const slopeRise = 5.5 * smoothstep2(shore - 28, shore - 9, x);
     const trench = -6 * gaussian(x, trenchCenter, 4.2);
@@ -42943,34 +42976,42 @@ void main() {
       return continentHeight(x, z);
     }
   }
-  function reservoirArch(x, z) {
-    const arch1 = gaussian(x, -20, 30) * 16;
-    const arch2 = gaussian(x, 62, 28) * 14;
-    const undulation = fbmNoise(x * 0.04, z * 0.03, 3, 0.04, 0.5) * 3 + Math.sin(x * 0.025 + z * 0.018) * 2.5;
-    return arch1 + arch2 + undulation;
+  function reservoirWave(x, z) {
+    const arch1 = gaussian(x, -65, 24) * 32;
+    const arch2 = gaussian(x, 55, 22) * 30;
+    const valley = -gaussian(x, -10, 22) * 12;
+    const undulation = Math.sin(x * 0.022 + 0.8) * 3 + Math.sin(x * 0.048 - 1.4) * 1.5 + fbmNoise(x * 0.03, z * 0.02, 2, 0.025, 0.5) * 1.8;
+    return arch1 + arch2 + valley + undulation;
   }
   function reservoirTopAt(x, z) {
-    const arch = reservoirArch(x, z);
-    return clamp2(S.reservoirTop + arch, S.reservoirBottom + 1, S.capRockTop - 2);
-  }
-  function waterproofTopAt(x, z) {
-    const arch = reservoirArch(x, z) * 0.65;
-    return clamp2(S.waterproofTop + arch, S.basementTop + 0.5, S.reservoirBottom + 15);
+    const wave = reservoirWave(x, z);
+    return Math.max(RES_TOP_BASE + wave, -72);
   }
   function reservoirBottomAt(x, z) {
-    return waterproofTopAt(x, z);
+    const wave = reservoirWave(x + 5, z);
+    const waveNorm = clamp2((wave - -12) / (32 - -12), 0, 1);
+    const ampLeft = mix(0.15, 0.92, waveNorm);
+    const ampRight = mix(0.15, 0.5, waveNorm);
+    const wLeft = gaussian(x, -65, 35);
+    const wRight = gaussian(x, 55, 30);
+    const wSum = wLeft + wRight + 1e-6;
+    const amp = (wLeft * ampLeft + wRight * ampRight) / wSum + (1 - clamp2(wLeft + wRight, 0, 1)) * mix(0.15, 0.45, waveNorm);
+    return Math.max(RES_BOT_BASE + wave * amp, -82);
+  }
+  function waterproofTopAt(x, z) {
+    return reservoirBottomAt(x, z);
   }
   function waterOilBoundAt(x, z) {
-    const archBottom = reservoirBottomAt(x, z);
-    const archTop = reservoirTopAt(x, z);
-    const thickness = archTop - archBottom;
-    return archBottom + thickness * 0.35;
+    const top = reservoirTopAt(x, z);
+    const bot = reservoirBottomAt(x, z);
+    if (top <= OIL_WATER_LEVEL) return top;
+    return clamp2(OIL_WATER_LEVEL, bot, top);
   }
   function oilGasBoundAt(x, z) {
-    const archBottom = reservoirBottomAt(x, z);
-    const archTop = reservoirTopAt(x, z);
-    const thickness = archTop - archBottom;
-    return archBottom + thickness * 0.7;
+    const top = reservoirTopAt(x, z);
+    const bot = reservoirBottomAt(x, z);
+    if (top <= OIL_GAS_LEVEL) return top;
+    return clamp2(OIL_GAS_LEVEL, bot, top);
   }
   function surfaceRockColor(x, y, z) {
     const layer = clamp2((y - S.lithBottom) / (S.surfaceRockTop - S.lithBottom), 0, 1);
@@ -43035,24 +43076,6 @@ void main() {
       clamp2(0.14 + layer * 0.06 + grain * 0.6, 0, 1),
       clamp2(0.12 + layer * 0.04 + grain * 0.4, 0, 1)
     );
-  }
-  function oceanCrustColorAt(x, y) {
-    const warmth = gaussian(x, S.ridgeX, 18) * 0.2;
-    const depthT = clamp2((y - S.lithBottom) / (S.seaLevel - S.lithBottom), 0, 1);
-    return new Color(
-      0.12 + depthT * 0.05 + warmth * 0.22,
-      0.12 + depthT * 0.05 + warmth * 0.08,
-      0.17 + depthT * 0.04 + warmth * 0.03
-    );
-  }
-  function continentCrustColorAt(x, y) {
-    if (y > 13) return new Color(0.92, 0.94, 0.96);
-    if (y > 10) return new Color(0.72, 0.7, 0.66);
-    if (y > 7) return new Color(0.6, 0.52, 0.42);
-    if (y > 5) return new Color(0.52, 0.56, 0.34);
-    if (y > S.seaLevel + 1) return new Color(0.64, 0.58, 0.4);
-    if (y > S.seaLevel - 2) return new Color(0.69, 0.62, 0.46);
-    return new Color(0.38, 0.32, 0.26);
   }
   function oceanTopColorAt(x, y, z) {
     const westShore = indiaWestCoast(z);
@@ -43254,24 +43277,39 @@ void main() {
     return mesh;
   }
   function createOceanWaterSurface(materialOptions = {}) {
-    const shorelineSamples = 84;
-    const shape = new Shape();
-    shape.moveTo(S.xMin, S.backZ);
-    shape.lineTo(S.xMin, S.frontZ);
-    for (let i = 0; i <= shorelineSamples; i++) {
-      const t = i / shorelineSamples;
-      const z = mix(S.frontZ, S.backZ, t);
-      const x = indiaWestCoast(z) + 0.7;
-      shape.lineTo(x, z);
+    const xMin = S.xMin;
+    const zMin = S.backZ, zMax = S.frontZ;
+    const nx = 120, nz = 80;
+    const dz = (zMax - zMin) / nz;
+    const posArr = [];
+    const idxArr = [];
+    const rowStart = new Int32Array(nz + 1);
+    let vtx = 0;
+    for (let iz = 0; iz <= nz; iz++) {
+      const z = zMin + iz * dz;
+      const shore = indiaWestCoast(z) + 0.7;
+      const xMax = shore;
+      const dx = (xMax - xMin) / nx;
+      rowStart[iz] = vtx;
+      for (let ix = 0; ix <= nx; ix++) {
+        const x = xMin + ix * dx;
+        const y = S.seaLevel + Math.sin(x * 0.18 + z * 0.11) * 0.9 + Math.sin(x * 0.31 - z * 0.19) * 0.55 + Math.sin(x * 0.07 + z * 0.25) * 0.35 + Math.cos(x * 0.24 - z * 0.08) * 0.2;
+        posArr.push(x, y, z);
+        vtx++;
+      }
     }
-    shape.closePath();
-    const geometry = new ShapeGeometry(shape, 240);
-    const positions = geometry.getAttribute("position");
-    for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i), z = positions.getY(i);
-      positions.setXYZ(i, x, S.seaLevel, z);
+    for (let iz = 0; iz < nz; iz++) {
+      for (let ix = 0; ix < nx; ix++) {
+        const a = rowStart[iz] + ix;
+        const b = rowStart[iz] + ix + 1;
+        const c = rowStart[iz + 1] + ix;
+        const d = rowStart[iz + 1] + ix + 1;
+        idxArr.push(a, c, b, b, c, d);
+      }
     }
-    positions.needsUpdate = true;
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute(posArr, 3));
+    geometry.setIndex(idxArr);
     geometry.computeVertexNormals();
     assignVertexColors(geometry, (x, y, z) => waterColorAt(x, y, z));
     const material = new MeshPhysicalMaterial({
@@ -43292,29 +43330,37 @@ void main() {
     return mesh;
   }
   function createBayWaterSurface(materialOptions = {}) {
-    const samples = 80;
-    const shape = new Shape();
-    for (let i = 0; i <= samples; i++) {
-      const t = i / samples;
-      const z = mix(S.backZ, S.frontZ, t);
-      const x = indiaEastCoast(z) + 0.3;
-      if (i === 0) shape.moveTo(x, z);
-      else shape.lineTo(x, z);
+    const zMin = S.backZ, zMax = S.frontZ;
+    const nx = 30, nz = 80;
+    const dz = (zMax - zMin) / nz;
+    const vertCount = (nx + 1) * (nz + 1);
+    const posArr = new Float32Array(vertCount * 3);
+    const idxArr = [];
+    for (let iz = 0; iz <= nz; iz++) {
+      for (let ix = 0; ix <= nx; ix++) {
+        const z = zMin + iz * dz;
+        const xLeft = indiaEastCoast(z) + 0.3;
+        const xRight = indiaEastCoast(z) + 5;
+        const x = mix(xLeft, xRight, ix / nx);
+        const wave = Math.sin(x * 0.18 + z * 0.11) * 0.7 + Math.sin(x * 0.31 - z * 0.19) * 0.4 + Math.cos(x * 0.24 - z * 0.08) * 0.25;
+        const vi = (iz * (nx + 1) + ix) * 3;
+        posArr[vi] = x;
+        posArr[vi + 1] = S.seaLevel + wave;
+        posArr[vi + 2] = z;
+      }
     }
-    for (let i = samples; i >= 0; i--) {
-      const t = i / samples;
-      const z = mix(S.backZ, S.frontZ, t);
-      const x = indiaEastCoast(z) + 5;
-      shape.lineTo(x, z);
+    for (let iz = 0; iz < nz; iz++) {
+      for (let ix = 0; ix < nx; ix++) {
+        const a = iz * (nx + 1) + ix;
+        const b = a + 1;
+        const c = a + (nx + 1);
+        const d = c + 1;
+        idxArr.push(a, c, b, b, c, d);
+      }
     }
-    shape.closePath();
-    const geometry = new ShapeGeometry(shape, 160);
-    const positions = geometry.getAttribute("position");
-    for (let i = 0; i < positions.count; i++) {
-      const x = positions.getX(i), z = positions.getY(i);
-      positions.setXYZ(i, x, S.seaLevel, z);
-    }
-    positions.needsUpdate = true;
+    const geometry = new BufferGeometry();
+    geometry.setAttribute("position", new Float32BufferAttribute(posArr, 3));
+    geometry.setIndex(idxArr);
     geometry.computeVertexNormals();
     assignVertexColors(geometry, (x, y, z) => bayWaterColorAt(x, y, z));
     const material = new MeshPhysicalMaterial({
@@ -43456,20 +43502,19 @@ void main() {
     gasZoneMesh.position.z = z + 0.04;
     group.add(gasZoneMesh);
     const capSegs = 200;
-    const capBottomPts = [];
+    const capTopPts = [], capBottomPts = [];
     for (let i = 0; i <= capSegs; i++) {
       const t = i / capSegs;
       const x = mix(S.xMin, S.xMax, t);
+      capTopPts.push(new Vector2(x, Math.min(terrainHeightAt(x, z), S.capRockTop)));
       capBottomPts.push(new Vector2(x, reservoirTopAt(x, z)));
     }
     const capRockShape = new Shape();
-    capRockShape.moveTo(S.xMin, S.capRockTop);
-    capRockShape.lineTo(S.xMax, S.capRockTop);
-    for (let i = capSegs; i >= 0; i--) {
-      capRockShape.lineTo(capBottomPts[i].x, capBottomPts[i].y);
-    }
+    capRockShape.moveTo(capTopPts[0].x, capTopPts[0].y);
+    for (let i = 1; i <= capSegs; i++) capRockShape.lineTo(capTopPts[i].x, capTopPts[i].y);
+    for (let i = capSegs; i >= 0; i--) capRockShape.lineTo(capBottomPts[i].x, capBottomPts[i].y);
     capRockShape.closePath();
-    const capRockGeo = new ShapeGeometry(capRockShape, 140);
+    const capRockGeo = new ShapeGeometry(capRockShape, 160);
     capRockGeo.computeVertexNormals();
     assignVertexColors(capRockGeo, (x, y) => capRockColor(x, y, z));
     const capRockMesh = new Mesh(capRockGeo, new MeshStandardMaterial({
@@ -43480,72 +43525,86 @@ void main() {
     }));
     capRockMesh.position.z = z + 0.05;
     group.add(capRockMesh);
-    const surfaceRockShape = new Shape();
-    surfaceRockShape.moveTo(S.xMin, S.lithBottom);
-    surfaceRockShape.lineTo(S.xMax, S.lithBottom);
-    surfaceRockShape.lineTo(S.xMax, S.surfaceRockTop);
-    surfaceRockShape.lineTo(S.xMin, S.surfaceRockTop);
-    surfaceRockShape.closePath();
-    const surfaceRockGeo = new ShapeGeometry(surfaceRockShape, 80);
-    surfaceRockGeo.computeVertexNormals();
-    assignVertexColors(surfaceRockGeo, (x, y) => surfaceRockColor(x, y, z));
-    const surfaceRockMesh = new Mesh(surfaceRockGeo, new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.9,
-      metalness: 0.01,
-      side: DoubleSide
-    }));
-    surfaceRockMesh.position.z = z + 0.06;
-    group.add(surfaceRockMesh);
-    const crustShape = new Shape();
-    crustShape.moveTo(S.xMin, S.surfaceRockTop);
-    for (let i = 0; i <= segs; i++) {
-      crustShape.lineTo(profilePoints[i].x, profilePoints[i].y);
-    }
-    crustShape.lineTo(S.xMax, S.surfaceRockTop);
-    crustShape.closePath();
-    const crustGeo = new ShapeGeometry(crustShape, 300);
-    crustGeo.computeVertexNormals();
-    assignVertexColors(crustGeo, (x, y) => {
-      const westShore2 = indiaWestCoast(z);
-      const eastShore2 = indiaEastCoast(z);
-      const bayEnd2 = eastShore2 + 5;
-      if (x < westShore2) return oceanCrustColorAt(x, y);
-      else if (x < eastShore2) return continentCrustColorAt(x, y);
-      else if (x < bayEnd2) {
-        const subductT = clamp2((y - S.lithBottom) / (-S.lithBottom + S.seaLevel), 0, 1);
-        return new Color(
-          mix(0.48, 0.72, subductT),
-          mix(0.14, 0.32, subductT),
-          mix(0.1, 0.22, subductT)
-        );
-      } else {
-        return continentCrustColorAt(x, y);
+    {
+      let buildStripGeo = function(xArr, botArr, topArr, colorFn) {
+        const n = xArr.length;
+        const posArr = [], colArr = [], idxArr = [];
+        const colVtx = new Int32Array(n).fill(-1);
+        let vtx = 0;
+        for (let i = 0; i < n; i++) {
+          const x = xArr[i];
+          const yB = botArr[i];
+          const yT = topArr[i];
+          if (yT - yB < 1e-3) continue;
+          colVtx[i] = vtx;
+          posArr.push(x, yB, 0, x, yT, 0);
+          const cB = colorFn(x, yB);
+          colArr.push(cB.r, cB.g, cB.b);
+          const cT = colorFn(x, yT);
+          colArr.push(cT.r, cT.g, cT.b);
+          vtx += 2;
+        }
+        for (let i = 0; i < n - 1; i++) {
+          const a = colVtx[i], b = colVtx[i + 1];
+          if (a < 0 || b < 0) continue;
+          idxArr.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+        const geo = new BufferGeometry();
+        geo.setAttribute("position", new Float32BufferAttribute(posArr, 3));
+        geo.setAttribute("color", new Float32BufferAttribute(colArr, 3));
+        geo.setIndex(idxArr);
+        geo.computeVertexNormals();
+        return geo;
+      };
+      const segsLC = 300;
+      const xs = new Float32Array(segsLC + 1);
+      const botFlat = new Float32Array(segsLC + 1);
+      const midBound = new Float32Array(segsLC + 1);
+      const topTerr = new Float32Array(segsLC + 1);
+      for (let i = 0; i <= segsLC; i++) {
+        const x = mix(S.xMin, S.xMax, i / segsLC);
+        xs[i] = x;
+        botFlat[i] = S.lithBottom;
+        const cBot = crustBottomAt(x, z);
+        const cTop = terrainHeightAt(x, z);
+        midBound[i] = cBot;
+        topTerr[i] = cTop;
       }
-    });
-    const crustMesh = new Mesh(crustGeo, new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.88,
-      metalness: 0.03,
-      emissive: new Color(1773572),
-      emissiveIntensity: 0.12,
-      side: DoubleSide
-    }));
-    crustMesh.position.z = z + 0.07;
-    group.add(crustMesh);
+      const srGeo = buildStripGeo(xs, botFlat, midBound, (x, y) => surfaceRockColor(x, y, z));
+      const srMesh = new Mesh(srGeo, new MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0.01,
+        side: DoubleSide
+      }));
+      srMesh.position.z = z - 0.1;
+      group.add(srMesh);
+      const crColor = new Color(0.28, 0.28, 0.3);
+      const crGeo = buildStripGeo(xs, midBound, topTerr, () => crColor);
+      const crMesh = new Mesh(crGeo, new MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.88,
+        metalness: 0.01,
+        side: DoubleSide
+      }));
+      crMesh.position.z = z - 0.1;
+      crMesh.renderOrder = 2;
+      group.add(crMesh);
+    }
     const westShore = indiaWestCoast(z);
     const eastShore = indiaEastCoast(z);
     const bayEnd = eastShore + 5;
+    const owSegs = 150;
     const oceanWaterShape = new Shape();
-    oceanWaterShape.moveTo(S.xMin, S.seaLevel);
-    oceanWaterShape.lineTo(westShore, S.seaLevel);
-    for (let i = segs; i >= 0; i--) {
-      const t = i / segs;
-      const x = mix(S.xMin, S.xMax, t);
-      if (x >= S.xMin && x <= westShore) {
-        const y = Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1);
-        oceanWaterShape.lineTo(x, y);
-      }
+    oceanWaterShape.moveTo(S.xMin, S.seaLevel + seaWaveAt(S.xMin, z));
+    for (let i = 1; i <= owSegs; i++) {
+      const x = mix(S.xMin, westShore, i / owSegs);
+      oceanWaterShape.lineTo(x, S.seaLevel + seaWaveAt(x, z));
+    }
+    for (let i = owSegs; i >= 0; i--) {
+      const x = mix(S.xMin, westShore, i / owSegs);
+      const y = Math.max(Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1), S.basementBottom);
+      oceanWaterShape.lineTo(x, y);
     }
     oceanWaterShape.closePath();
     const oceanWaterGeo = new ShapeGeometry(oceanWaterShape, 150);
@@ -43564,16 +43623,17 @@ void main() {
     oceanWaterMesh.position.z = z + 0.09;
     oceanWaterMesh.renderOrder = 5;
     group.add(oceanWaterMesh);
+    const bwSegs = 60;
     const bayWaterShape = new Shape();
-    bayWaterShape.moveTo(eastShore, S.seaLevel);
-    bayWaterShape.lineTo(bayEnd, S.seaLevel);
-    for (let i = segs; i >= 0; i--) {
-      const t = i / segs;
-      const x = mix(S.xMin, S.xMax, t);
-      if (x >= eastShore && x <= bayEnd) {
-        const y = Math.min(bayBedHeight(x, z), S.seaLevel - 0.1);
-        bayWaterShape.lineTo(x, y);
-      }
+    bayWaterShape.moveTo(eastShore, S.seaLevel + seaWaveAt(eastShore, z));
+    for (let i = 1; i <= bwSegs; i++) {
+      const x = mix(eastShore, bayEnd, i / bwSegs);
+      bayWaterShape.lineTo(x, S.seaLevel + seaWaveAt(x, z));
+    }
+    for (let i = bwSegs; i >= 0; i--) {
+      const x = mix(eastShore, bayEnd, i / bwSegs);
+      const y = Math.max(Math.min(bayBedHeight(x, z), S.seaLevel - 0.1), S.basementBottom);
+      bayWaterShape.lineTo(x, y);
     }
     bayWaterShape.closePath();
     const bayWaterGeo = new ShapeGeometry(bayWaterShape, 60);
@@ -43757,67 +43817,98 @@ void main() {
     }));
     gMesh.position.z = z - 0.04;
     group.add(gMesh);
-    const capBottomPts = [];
-    for (let i = 0; i <= segs; i++) {
-      const t = i / segs;
-      const x = mix(S.xMin, S.xMax, t);
-      capBottomPts.push(new Vector2(x, reservoirTopAt(x, z)));
+    {
+      const cSegs = 160;
+      const cTopPts = [], cBotPts = [];
+      for (let i = 0; i <= cSegs; i++) {
+        const t = i / cSegs;
+        const x = mix(S.xMin, S.xMax, t);
+        cTopPts.push(new Vector2(x, Math.min(terrainHeightAt(x, z), S.capRockTop)));
+        cBotPts.push(new Vector2(x, reservoirTopAt(x, z)));
+      }
+      const cShape = new Shape();
+      cShape.moveTo(cTopPts[0].x, cTopPts[0].y);
+      for (let i = 1; i <= cSegs; i++) cShape.lineTo(cTopPts[i].x, cTopPts[i].y);
+      for (let i = cSegs; i >= 0; i--) cShape.lineTo(cBotPts[i].x, cBotPts[i].y);
+      cShape.closePath();
+      const cGeo = new ShapeGeometry(cShape, 120);
+      cGeo.computeVertexNormals();
+      assignVertexColors(cGeo, (x, y) => capRockColor(x, y, z));
+      const cMesh = new Mesh(cGeo, new MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.88,
+        metalness: 0.02,
+        side: DoubleSide
+      }));
+      cMesh.position.z = z - 0.05;
+      group.add(cMesh);
     }
-    const cShape = new Shape();
-    cShape.moveTo(S.xMin, S.capRockTop);
-    cShape.lineTo(S.xMax, S.capRockTop);
-    for (let i = segs; i >= 0; i--) cShape.lineTo(capBottomPts[i].x, capBottomPts[i].y);
-    cShape.closePath();
-    const cGeo = new ShapeGeometry(cShape, 80);
-    cGeo.computeVertexNormals();
-    assignVertexColors(cGeo, (x, y) => capRockColor(x, y, z));
-    const cMesh = new Mesh(cGeo, new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.88,
-      metalness: 0.02,
-      side: DoubleSide
-    }));
-    cMesh.position.z = z - 0.05;
-    group.add(cMesh);
-    const sShape = new Shape();
-    sShape.moveTo(S.xMin, S.lithBottom);
-    sShape.lineTo(S.xMax, S.lithBottom);
-    sShape.lineTo(S.xMax, S.surfaceRockTop);
-    sShape.lineTo(S.xMin, S.surfaceRockTop);
-    sShape.closePath();
-    const sGeo = new ShapeGeometry(sShape, 40);
-    sGeo.computeVertexNormals();
-    assignVertexColors(sGeo, (x, y) => surfaceRockColor(x, y, z));
-    const sMesh = new Mesh(sGeo, new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.9,
-      metalness: 0.01,
-      side: DoubleSide
-    }));
-    sMesh.position.z = z - 0.06;
-    group.add(sMesh);
-    const profilePts = [];
-    for (let i = 0; i <= segs; i++) {
-      const t = i / segs;
-      const x = mix(S.xMin, S.xMax, t);
-      profilePts.push(new Vector2(x, terrainHeightAt(x, z)));
+    {
+      let buildStripGeoB = function(xArr, botArr, topArr, colorFn) {
+        const n = xArr.length;
+        const posArr = [], colArr = [], idxArr = [];
+        const colVtx = new Int32Array(n).fill(-1);
+        let vtx = 0;
+        for (let i = 0; i < n; i++) {
+          const x = xArr[i];
+          const yB = botArr[i];
+          const yT = topArr[i];
+          if (yT - yB < 1e-3) continue;
+          colVtx[i] = vtx;
+          posArr.push(x, yB, 0, x, yT, 0);
+          const cB = colorFn(x, yB);
+          colArr.push(cB.r, cB.g, cB.b);
+          const cT = colorFn(x, yT);
+          colArr.push(cT.r, cT.g, cT.b);
+          vtx += 2;
+        }
+        for (let i = 0; i < n - 1; i++) {
+          const a = colVtx[i], b = colVtx[i + 1];
+          if (a < 0 || b < 0) continue;
+          idxArr.push(a, a + 1, b, a + 1, b + 1, b);
+        }
+        const geo = new BufferGeometry();
+        geo.setAttribute("position", new Float32BufferAttribute(posArr, 3));
+        geo.setAttribute("color", new Float32BufferAttribute(colArr, 3));
+        geo.setIndex(idxArr);
+        geo.computeVertexNormals();
+        return geo;
+      };
+      const segsB = 300;
+      const xsB = new Float32Array(segsB + 1);
+      const botFlatB = new Float32Array(segsB + 1);
+      const midBoundB = new Float32Array(segsB + 1);
+      const topTerrB = new Float32Array(segsB + 1);
+      for (let i = 0; i <= segsB; i++) {
+        const x = mix(S.xMin, S.xMax, i / segsB);
+        xsB[i] = x;
+        botFlatB[i] = S.lithBottom;
+        const cBotB = crustBottomAt(x, z);
+        const cTopB = terrainHeightAt(x, z);
+        midBoundB[i] = cBotB;
+        topTerrB[i] = cTopB;
+      }
+      const srGeo2 = buildStripGeoB(xsB, botFlatB, midBoundB, (x, y) => surfaceRockColor(x, y, z));
+      const srMesh2 = new Mesh(srGeo2, new MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0.01,
+        side: DoubleSide
+      }));
+      srMesh2.position.z = z - 0.06;
+      group.add(srMesh2);
+      const crColorB = new Color(0.28, 0.28, 0.3);
+      const crGeo2 = buildStripGeoB(xsB, midBoundB, topTerrB, () => crColorB);
+      const crMesh2 = new Mesh(crGeo2, new MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.88,
+        metalness: 0.01,
+        side: DoubleSide
+      }));
+      crMesh2.position.z = z - 0.07;
+      crMesh2.renderOrder = 2;
+      group.add(crMesh2);
     }
-    const crShape = new Shape();
-    crShape.moveTo(S.xMin, S.surfaceRockTop);
-    for (const p of profilePts) crShape.lineTo(p.x, p.y);
-    crShape.lineTo(S.xMax, S.surfaceRockTop);
-    crShape.closePath();
-    const crGeo = new ShapeGeometry(crShape, 160);
-    crGeo.computeVertexNormals();
-    assignVertexColors(crGeo, (x, y) => continentCrustColorAt(x, y));
-    const crMesh = new Mesh(crGeo, new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.88,
-      metalness: 0.02,
-      side: DoubleSide
-    }));
-    crMesh.position.z = z - 0.07;
-    group.add(crMesh);
     return group;
   }
   function createSubsurfaceLayers(textures) {
@@ -43938,8 +44029,11 @@ void main() {
     group.name = `SideWall_${xPosition > 0 ? "Right" : "Left"}`;
     const segs = 160;
     const ySegs = 12;
+    const wallBackZ = S.backZ + 0.15;
+    const wallFrontZ = S.frontZ - 0.15;
+    const wallDepth = wallFrontZ - wallBackZ;
     function addLayer(yBot, yTop, colorFn, matOpts = {}) {
-      const geo = new PlaneGeometry(S.depth, yTop - yBot, segs, ySegs);
+      const geo = new PlaneGeometry(wallDepth, yTop - yBot, segs, ySegs);
       const pos = geo.getAttribute("position");
       const colors = new Float32Array(pos.count * 3);
       for (let i = 0; i < pos.count; i++) {
@@ -43964,90 +44058,176 @@ void main() {
       mesh.position.set(xPosition, (yBot + yTop) * 0.5, 0);
       group.add(mesh);
     }
+    function addDynamicLayer(botFn, topFn, colorFn, ySubdiv = 8, matOpts = {}, layerOrder = 0) {
+      const posArr = [], colArr = [], idxArr = [];
+      const rows = ySubdiv + 1;
+      for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        const zv = mix(wallBackZ, wallFrontZ, t);
+        const yBot = botFn(zv);
+        const yTop = topFn(zv);
+        for (let j = 0; j < rows; j++) {
+          const tj = j / (rows - 1);
+          const yv = yBot + (yTop - yBot) * tj;
+          posArr.push(xPosition, yv, zv);
+          const c = colorFn(xPosition, yv, zv);
+          colArr.push(c.r, c.g, c.b);
+        }
+      }
+      for (let i = 0; i < segs; i++) {
+        for (let j = 0; j < rows - 1; j++) {
+          const a = i * rows + j;
+          const b = i * rows + j + 1;
+          const c = (i + 1) * rows + j;
+          const d = (i + 1) * rows + j + 1;
+          idxArr.push(a, b, c, b, d, c);
+        }
+      }
+      const geo = new BufferGeometry();
+      geo.setAttribute("position", new Float32BufferAttribute(posArr, 3));
+      geo.setAttribute("color", new Float32BufferAttribute(colArr, 3));
+      geo.setIndex(idxArr);
+      geo.computeVertexNormals();
+      const mat = new MeshStandardMaterial({
+        vertexColors: true,
+        roughness: 0.9,
+        metalness: 0.02,
+        side: DoubleSide,
+        // polygonOffset 让每层在深度缓冲中微小错开，消除共面 Z-fighting
+        polygonOffset: true,
+        polygonOffsetFactor: -layerOrder,
+        polygonOffsetUnits: -layerOrder,
+        ...matOpts
+      });
+      const mesh = new Mesh(geo, mat);
+      mesh.renderOrder = layerOrder;
+      group.add(mesh);
+    }
     addLayer(
       S.basementBottom,
       S.basementTop,
       (x, y, z) => basementRockColor(x, y, z),
-      { roughness: 0.92, metalness: 0.04 }
+      { roughness: 0.92, metalness: 0.04, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 }
     );
-    addLayer(
-      S.waterproofBottom,
-      S.waterproofTop,
-      (x, y, z) => waterproofLayerColor(x, y, z)
+    addDynamicLayer(
+      () => S.waterproofBottom,
+      (zv) => reservoirBottomAt(xPosition, zv),
+      (x, y, z) => waterproofLayerColor(x, y, z),
+      6,
+      {},
+      1
     );
-    addLayer(
-      S.reservoirBottom,
-      S.reservoirTop,
-      (x, y, z) => {
-        const resBottom = reservoirBottomAt(x, z);
-        const resTop = reservoirTopAt(x, z);
-        const woBound = waterOilBoundAt(x, z);
-        const ogBound = oilGasBoundAt(x, z);
-        if (y <= woBound) return waterZoneColor(x, y, z);
-        if (y <= ogBound) return oilZoneColor(x, y, z);
-        return gasZoneColor(x, y, z);
-      },
-      { emissive: new Color(394242), emissiveIntensity: 0.1 }
+    addDynamicLayer(
+      (zv) => reservoirBottomAt(xPosition, zv),
+      (zv) => waterOilBoundAt(xPosition, zv),
+      (x, y, z) => waterZoneColor(x, y, z),
+      4,
+      { emissive: new Color(132104), emissiveIntensity: 0.08 },
+      2
     );
-    addLayer(
-      S.capRockBottom,
-      S.capRockTop,
-      (x, y, z) => capRockColor(x, y, z)
+    addDynamicLayer(
+      (zv) => waterOilBoundAt(xPosition, zv),
+      (zv) => oilGasBoundAt(xPosition, zv),
+      (x, y, z) => oilZoneColor(x, y, z),
+      4,
+      { emissive: new Color(394242), emissiveIntensity: 0.1 },
+      3
     );
-    addLayer(
-      S.lithBottom,
-      S.surfaceRockTop,
-      (x, y, z) => surfaceRockColor(x, y, z)
+    addDynamicLayer(
+      (zv) => oilGasBoundAt(xPosition, zv),
+      (zv) => reservoirTopAt(xPosition, zv),
+      (x, y, z) => gasZoneColor(x, y, z),
+      4,
+      { emissive: new Color(394242), emissiveIntensity: 0.1 },
+      4
     );
-    const posArr = [], idxArr = [], uvArr = [], colArr = [];
-    for (let i = 0; i <= segs; i++) {
-      const t = i / segs;
-      const zv = mix(S.backZ, S.frontZ, t);
-      const topY = terrainHeightAt(xPosition, zv);
-      const botY = S.surfaceRockTop;
-      posArr.push(xPosition, topY, zv);
-      posArr.push(xPosition, botY, zv);
-      uvArr.push(t, 1);
-      uvArr.push(t, 0);
-      const cTop = continentCrustColorAt(xPosition, topY);
-      const cBot = continentCrustColorAt(xPosition, botY);
-      colArr.push(cTop.r, cTop.g, cTop.b);
-      colArr.push(cBot.r, cBot.g, cBot.b);
+    addDynamicLayer(
+      (zv) => reservoirTopAt(xPosition, zv),
+      () => S.capRockTop,
+      (x, y, z) => capRockColor(x, y, z),
+      6,
+      {},
+      5
+    );
+    addDynamicLayer(
+      () => S.lithBottom,
+      (zv) => crustBottomAt(xPosition, zv),
+      (x, y, z) => surfaceRockColor(x, y, z),
+      4,
+      { polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 },
+      6
+    );
+    addDynamicLayer(
+      (zv) => crustBottomAt(xPosition, zv),
+      (zv) => Math.min(terrainHeightAt(xPosition, zv), S.surfaceRockTop),
+      () => new Color(0.28, 0.28, 0.3),
+      4,
+      { polygonOffset: true, polygonOffsetFactor: -7, polygonOffsetUnits: -7 },
+      7
+    );
+    {
+      const cPosArr = [], cIdxArr = [], cUvArr = [], cColArr = [];
+      const colStart = [];
+      let vtxCount = 0;
+      for (let i = 0; i <= segs; i++) {
+        const t = i / segs;
+        const zv = mix(wallBackZ, wallFrontZ, t);
+        const topY = terrainHeightAt(xPosition, zv);
+        const botY = S.surfaceRockTop;
+        if (topY <= botY) {
+          colStart.push(-1);
+          continue;
+        }
+        colStart.push(vtxCount);
+        cPosArr.push(xPosition, topY, zv);
+        cPosArr.push(xPosition, botY, zv);
+        cUvArr.push(t, 1);
+        cUvArr.push(t, 0);
+        const crustGrayColor = new Color(0.28, 0.28, 0.3);
+        const cTop = crustGrayColor;
+        const cBot = crustGrayColor;
+        cColArr.push(cTop.r, cTop.g, cTop.b);
+        cColArr.push(cBot.r, cBot.g, cBot.b);
+        vtxCount += 2;
+      }
+      for (let i = 0; i < segs; i++) {
+        const sa = colStart[i], sb = colStart[i + 1];
+        if (sa < 0 || sb < 0) continue;
+        const a = sa, b = sa + 1, c = sb, d = sb + 1;
+        cIdxArr.push(a, b, c, b, d, c);
+      }
+      if (cPosArr.length >= 9) {
+        const crustGeo = new BufferGeometry();
+        crustGeo.setAttribute("position", new Float32BufferAttribute(cPosArr, 3));
+        crustGeo.setAttribute("uv", new Float32BufferAttribute(cUvArr, 2));
+        crustGeo.setAttribute("color", new Float32BufferAttribute(cColArr, 3));
+        crustGeo.setIndex(cIdxArr);
+        crustGeo.computeVertexNormals();
+        const crustMat = new MeshStandardMaterial({
+          vertexColors: true,
+          roughness: 0.88,
+          metalness: 0.01,
+          side: DoubleSide,
+          polygonOffset: true,
+          polygonOffsetFactor: -8,
+          polygonOffsetUnits: -8
+        });
+        group.add(new Mesh(crustGeo, crustMat));
+      }
     }
-    for (let i = 0; i < segs; i++) {
-      const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
-      idxArr.push(a, b, c, b, d, c);
-    }
-    const crustGeo = new BufferGeometry();
-    crustGeo.setAttribute("position", new Float32BufferAttribute(posArr, 3));
-    crustGeo.setAttribute("uv", new Float32BufferAttribute(uvArr, 2));
-    crustGeo.setAttribute("color", new Float32BufferAttribute(colArr, 3));
-    crustGeo.setIndex(idxArr);
-    crustGeo.computeVertexNormals();
-    const crustMat = new MeshStandardMaterial({
-      vertexColors: true,
-      roughness: 0.94,
-      metalness: 0.01,
-      map: textures.rockColor,
-      bumpMap: textures.rockBump,
-      roughnessMap: textures.rockRoughness,
-      bumpScale: 0.35,
-      side: DoubleSide
-    });
-    group.add(new Mesh(crustGeo, crustMat));
     const isOceanSide = xPosition <= S.xMin + 1;
     if (isOceanSide) {
       const westShore = indiaWestCoast(0);
       const wPosArr = [], wIdxArr = [], wColArr = [];
       for (let i = 0; i <= segs; i++) {
         const t = i / segs;
-        const zv = mix(S.backZ, S.frontZ, t);
+        const zv = mix(wallBackZ, wallFrontZ, t);
         const ws = indiaWestCoast(zv);
         if (xPosition > ws) continue;
-        const floorY = Math.min(oceanFloorHeight(xPosition, zv), S.seaLevel - 0.1);
-        wPosArr.push(xPosition, S.seaLevel, zv);
+        const floorY = Math.max(Math.min(oceanFloorHeight(xPosition, zv), S.seaLevel - 0.1), S.basementBottom);
+        const topY = S.seaLevel + seaWaveAt(xPosition, zv);
+        wPosArr.push(xPosition, topY, zv);
         wPosArr.push(xPosition, floorY, zv);
-        const w = i;
         wColArr.push(0.04, 0.22, 0.62);
         wColArr.push(0.02, 0.12, 0.42);
       }
@@ -44356,8 +44536,9 @@ void main() {
       { roughness: 0.98, metalness: 0.02, emissive: new Color(988966), emissiveIntensity: 0.16 }
     );
     root.add(oceanFloorTop);
-    const waterBedProfileBack = sampleProfile(S.backZ, S.xMin, westShore0 + 0.8, 180, (x, z) => Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1));
-    const waterTopProfileBack = waterBedProfileBack.map((p) => new Vector2(p.x, S.seaLevel));
+    const westShoreBack = indiaWestCoast(S.backZ);
+    const waterBedProfileBack = sampleProfile(S.backZ, S.xMin, westShoreBack, 180, (x, z) => Math.max(Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1), S.basementBottom));
+    const waterTopProfileBack = waterBedProfileBack.map((p) => new Vector2(p.x, S.seaLevel + seaWaveAt(p.x, S.backZ)));
     const waterBack = createFilledSection(waterTopProfileBack, waterBedProfileBack, waterColorAt, {
       opacity: 0.78,
       emissive: new Color(1208496),
@@ -44387,12 +44568,15 @@ void main() {
       const bayEndBack = eastShoreBack + 5;
       const segs = 40;
       const bayBackShape = new Shape();
-      bayBackShape.moveTo(eastShoreBack, S.seaLevel);
-      bayBackShape.lineTo(bayEndBack, S.seaLevel);
+      bayBackShape.moveTo(eastShoreBack, S.seaLevel + seaWaveAt(eastShoreBack, zBack));
+      for (let i = 1; i <= segs; i++) {
+        const x = mix(eastShoreBack, bayEndBack, i / segs);
+        bayBackShape.lineTo(x, S.seaLevel + seaWaveAt(x, zBack));
+      }
       for (let i = segs; i >= 0; i--) {
         const t = i / segs;
         const x = mix(eastShoreBack, bayEndBack, t);
-        const y = Math.min(bayBedHeight(x, zBack), S.seaLevel - 0.1);
+        const y = Math.max(Math.min(bayBedHeight(x, zBack), S.seaLevel - 0.1), S.basementBottom);
         bayBackShape.lineTo(x, y);
       }
       bayBackShape.closePath();
@@ -44565,19 +44749,19 @@ void main() {
       root.add(bottomPlane);
     }
     {
-      const lwX = 40;
+      const lwX = 55;
       const lwZ = S.frontZ;
       const lwSurfaceY = continentHeight(lwX, lwZ);
-      const lwOilLayerY = oilGasBoundAt(lwX, lwZ) - 2;
+      const lwOilLayerY = (waterOilBoundAt(lwX, lwZ) + oilGasBoundAt(lwX, lwZ)) * 0.5;
       const landWell = createLandOilWell(lwX, lwZ, lwSurfaceY, lwOilLayerY);
       root.add(landWell);
     }
     {
-      const owX = -55;
-      const owZ = 10;
+      const owX = -65;
+      const owZ = 5;
       const owSeaLevel = S.seaLevel;
       const owSeabedY = oceanFloorHeight(owX, owZ);
-      const owOilLayerY = oilGasBoundAt(owX, owZ) - 2;
+      const owOilLayerY = (waterOilBoundAt(owX, owZ) + oilGasBoundAt(owX, owZ)) * 0.5;
       const offshorePlatform = createOffshoreOilPlatform(owX, owZ, owSeaLevel, owSeabedY, owOilLayerY);
       root.add(offshorePlatform);
     }
@@ -44585,11 +44769,11 @@ void main() {
       ridge: new Vector3(S.ridgeX + 6, S.seaLevel + 18, -8),
       india: new Vector3(-15, S.seaLevel + 12, -18),
       eurasia: new Vector3(80, S.eurAsiaPeakMax + 12, 18),
-      // 石油地下锚点（用于标签）
-      gasZone: new Vector3(-15, S.oilGasBound + 3, S.frontZ),
-      oilZone: new Vector3(-15, (S.waterOilBound + S.oilGasBound) * 0.5, S.frontZ),
-      waterZone: new Vector3(-15, S.reservoirBottom + 2, S.frontZ),
-      waterproof: new Vector3(40, S.waterproofBottom + 3, S.frontZ),
+      // 石油地下锚点（用于标签）— 使用右拱顶(x=55)的实际动态高度
+      gasZone: new Vector3(55, oilGasBoundAt(55, S.frontZ) + 1.5, S.frontZ),
+      oilZone: new Vector3(55, (waterOilBoundAt(55, S.frontZ) + oilGasBoundAt(55, S.frontZ)) * 0.5, S.frontZ),
+      waterZone: new Vector3(55, reservoirBottomAt(55, S.frontZ) + 2, S.frontZ),
+      waterproof: new Vector3(40, waterproofTopAt(40, S.frontZ) - 3, S.frontZ),
       capRock: new Vector3(-50, S.capRockBottom + 3, S.frontZ)
     };
     return {
@@ -44600,7 +44784,7 @@ void main() {
       }
     };
   }
-  var S;
+  var S, RES_TOP_BASE, RES_BOT_BASE, OIL_WATER_LEVEL, OIL_GAS_LEVEL;
   var init_TectonicLandscape = __esm({
     "src/geometry/TectonicLandscape.js"() {
       init_three_module();
@@ -44615,31 +44799,29 @@ void main() {
         // 地表岩石底（原岩石圈底）
         lithBottom: -15,
         // 地下分层边界（从下往上）
-        basementBottom: -80,
-        // 基底岩石底
-        basementTop: -65,
+        basementBottom: -95,
+        // 基底岩石底（要足够深，容纳储集层底面最深 -80）
+        basementTop: -80,
         // 基底岩石顶 / 不透水底层底
-        waterproofBottom: -65,
+        waterproofBottom: -80,
         // 不透水底层底
-        waterproofTop: -50,
-        // 不透水底层顶 / 储集层底
-        reservoirBottom: -50,
-        // 储集层底（地层水底）
+        waterproofTop: -63,
+        // 不透水底层顶（向斜处平均储集层底，实际动态）
+        reservoirBottom: -63,
+        // 储集层底（动态函数 reservoirBottomAt 的平均基准）
         reservoirTop: -28,
-        // 储集层顶（拱顶顶部）
+        // 储集层顶（拱顶顶部，盖层底面）
         capRockBottom: -28,
-        // 盖层底
+        // 盖层底（与储集层顶面衔接，动态弯曲）
         capRockTop: -15,
         // 盖层顶 / 浅层砂岩底
         surfaceRockTop: 0,
         // 浅层砂岩顶（地表）
-        // 储集层内三分：water/oil/gas 边界
-        // 地层水在底部，石油在中间，天然气在拱顶
-        // 这些是"平均"高度，实际储集层面随拱形波动
-        waterOilBound: -43,
-        // 水-油边界（在储集层内，向上）
-        oilGasBound: -36,
-        // 油-气边界（拱顶附近）
+        // 油水/油气分界（固定水平线，仅供标签参考；实际分界由 waterOilBoundAt/oilGasBoundAt 计算）
+        waterOilBound: -44,
+        // 固定油水界面 Y（= OIL_WATER_LEVEL）
+        oilGasBound: -34,
+        // 固定油气界面 Y（= OIL_GAS_LEVEL）
         ridgeX: -75,
         coastMeanX: 0,
         indiaWestMeanX: -30,
@@ -44653,6 +44835,10 @@ void main() {
         eurAsiaPeakMax: 15,
         mountainWidth: 8
       };
+      RES_TOP_BASE = -55;
+      RES_BOT_BASE = -70;
+      OIL_WATER_LEVEL = -44;
+      OIL_GAS_LEVEL = -34;
     }
   });
 
@@ -44661,7 +44847,7 @@ void main() {
   __export(TectonicModel_exports, {
     TectonicModel: () => TectonicModel
   });
-  var S2, TectonicModel;
+  var TectonicModel;
   var init_TectonicModel = __esm({
     "src/models/TectonicModel.js"() {
       init_three_module();
@@ -44671,28 +44857,6 @@ void main() {
       init_RenderPass();
       init_UnrealBloomPass();
       init_TectonicLandscape();
-      S2 = {
-        xMin: -130,
-        xMax: 110,
-        depth: 112,
-        halfDepth: 56,
-        frontZ: 56,
-        backZ: -56,
-        seaLevel: 5,
-        basementBottom: -80,
-        basementTop: -65,
-        waterproofBottom: -65,
-        waterproofTop: -50,
-        reservoirBottom: -50,
-        reservoirTop: -28,
-        capRockBottom: -28,
-        capRockTop: -15,
-        surfaceRockTop: 0,
-        waterOilBound: -43,
-        oilGasBound: -36,
-        ridgeX: -75,
-        eurAsiaPeakMax: 15
-      };
       TectonicModel = class {
         constructor(container) {
           this.container = container;
@@ -44730,71 +44894,7 @@ void main() {
 <style>
 #tectonicCanvas { width: 100%; height: 100%; }
 
-/* \u2500\u2500 \u5730\u5C42\u6807\u7B7E\u6837\u5F0F \u2500\u2500 */
-.geo-teach-label {
-    pointer-events: none;
-    /* \u6807\u7B7E\u5411\u5DE6\u5C55\u5F00\uFF0C\u951A\u70B9\u5728\u6807\u7B7E\u6700\u53F3\u7AEF\uFF08\u5373\u7BAD\u5934\u5C16\u7AEF\u5904\uFF09 */
-    transform: translateX(-100%) translateY(-50%);
-    white-space: nowrap;
-    position: relative;
-    display: inline-block;
-}
-.geo-teach-label__box {
-    display: inline-flex;
-    align-items: center;
-    gap: 6px;
-    padding: 5px 10px 5px 10px;
-    background: rgba(4, 10, 22, 0.88);
-    border: 1px solid var(--label-border, #aaa);
-    border-left: 3px solid var(--label-border, #aaa);
-    border-radius: 3px;
-    font-family: 'Courier New', 'Consolas', monospace;
-    font-size: 11.5px;
-    letter-spacing: 0.06em;
-    color: #e8eef8;
-    box-shadow: 0 0 12px var(--label-glow, rgba(200,200,200,0.2)),
-                inset 0 0 6px rgba(255,255,255,0.02);
-    backdrop-filter: blur(3px);
-    -webkit-backdrop-filter: blur(3px);
-}
-/* \u7BAD\u5934\uFF1A\u6807\u7B7E\u53F3\u4FA7\u6307\u5411\u53F3\u65B9\uFF08\u6307\u5411\u573A\u666F\u5185\uFF09 */
-.geo-teach-label__arrow {
-    display: inline-block;
-    width: 32px;
-    height: 2px;
-    background: linear-gradient(90deg, var(--label-border, #aaa), transparent);
-    position: relative;
-    vertical-align: middle;
-    flex-shrink: 0;
-    margin-left: 2px;
-}
-.geo-teach-label__arrow::after {
-    content: '';
-    position: absolute;
-    right: 0;
-    top: 50%;
-    transform: translateY(-50%);
-    border-left: 7px solid var(--label-border, #aaa);
-    border-top: 5px solid transparent;
-    border-bottom: 5px solid transparent;
-}
-/* \u7EC8\u70B9\u5149\u70B9 */
-.geo-teach-label__dot {
-    position: absolute;
-    right: -5px;
-    top: 50%;
-    transform: translateY(-50%);
-    width: 6px;
-    height: 6px;
-    border-radius: 50%;
-    background: var(--label-border, #aaa);
-    box-shadow: 0 0 6px var(--label-glow, rgba(200,200,200,0.4));
-    animation: geoDotPulse 2.2s ease-in-out infinite;
-}
-@keyframes geoDotPulse {
-    0%, 100% { opacity: 1; transform: translateY(-50%) scale(1); }
-    50%       { opacity: 0.5; transform: translateY(-50%) scale(1.6); }
-}
+/* \u5730\u5C42\u6807\u7B7E\u9762\u677F\u5DF2\u79FB\u5165 3D \u573A\u666F\uFF0CHTML \u5C42\u65E0\u9700\u6837\u5F0F */
 </style>
 <header class="header">
     <div class="scan-line"></div>
@@ -44818,7 +44918,8 @@ void main() {
 
 
 <main class="canvas-wrap">
-    <div id="tectonicCanvas"></div>
+    <div id="tectonicCanvas">
+    </div>
     <div class="corner-deco tl"></div>
     <div class="corner-deco tr"></div>
     <div class="corner-deco bl"></div>
@@ -44931,52 +45032,164 @@ void main() {
           });
           this.tectonicModel.update(0.5, 1, "static");
         }
+        // ── 在正剖面平面（Z=56）内用 Canvas 贴图创建 3D 标签 ──────────
         setupLabels() {
-          const themes = {
-            ocean: { border: "#7fdcff", glow: "rgba(88, 210, 255, 0.35)" },
-            land: { border: "#f1f6ff", glow: "rgba(255, 255, 255, 0.2)" },
-            gas: { border: "#a0a0a0", glow: "rgba(160, 160, 160, 0.45)" },
-            oil: { border: "#555555", glow: "rgba(80, 80, 80, 0.50)" },
-            water: { border: "#2255cc", glow: "rgba(30, 80, 200, 0.45)" },
-            rock: { border: "#a08878", glow: "rgba(160, 130, 100, 0.30)" }
-          };
-          const addLabel = (text, themeName, position) => {
-            const root = document.createElement("div");
-            root.className = "geo-teach-label";
-            root.style.setProperty("--label-border", themes[themeName].border);
-            root.style.setProperty("--label-glow", themes[themeName].glow);
-            root.innerHTML = `<div class="geo-teach-label__box">${text}<span class="geo-teach-label__arrow"></span></div><div class="geo-teach-label__dot"></div>`;
-            const obj = new CSS2DObject(root);
-            obj.position.copy(position);
-            this.scene.add(obj);
-            return obj;
-          };
-          const anchors = this.tectonicModel.getAnchors ? this.tectonicModel.getAnchors() : {};
-          const LX = 20;
-          const LZ = S2.frontZ;
-          this.labels = {
-            // 储集层三分标签（从上到下：气→油→水→不透水）
-            gasZone: addLabel(
-              "\u5929\u7136\u6C14\u5C42 \xB7 Gas",
-              "gas",
-              new Vector3(LX, -20.5, LZ)
-            ),
-            oilZone: addLabel(
-              "\u77F3\u6CB9\u5C42 \xB7 Oil",
-              "oil",
-              new Vector3(LX, -28, LZ)
-            ),
-            waterZone: addLabel(
-              "\u5730\u5C42\u6C34 \xB7 Formation Water",
-              "water",
-              new Vector3(LX, -36, LZ)
-            ),
-            waterproof: addLabel(
-              "\u4E0D\u900F\u6C34\u5C42 \xB7 Waterproof",
-              "rock",
-              new Vector3(LX, -47, LZ)
-            )
-          };
+          const FZ = 56;
+          const labelDefs = [
+            { text: "\u542B\u6C14\u5C42 Gas", borderColor: "#888888", y: -29.5 },
+            { text: "\u542B\u6CB9\u5C42 Oil", borderColor: "#887744", y: -39 },
+            { text: "\u5730\u5C42\u6C34 Water", borderColor: "#2255bb", y: -49.5 },
+            { text: "\u9632\u6C34\u5C42 Waterproof", borderColor: "#775544", y: -71 }
+          ];
+          this._strataSprites = [];
+          for (const def of labelDefs) {
+            const labelMesh = this._makeStrataSprite(def.text, "#ffd060", def.borderColor);
+            labelMesh.position.set(-15, def.y, FZ + 0.8);
+            labelMesh.scale.set(32, 7, 1);
+            this.scene.add(labelMesh);
+            this._strataSprites.push(labelMesh);
+            const lineMesh = this._makeLineSprite(def.borderColor);
+            lineMesh.position.set(23, def.y, FZ + 0.8);
+            lineMesh.scale.set(44, 0.7, 1);
+            this.scene.add(lineMesh);
+            this._strataSprites.push(lineMesh);
+            const dot = this._makeDotSprite(def.borderColor);
+            dot.position.set(45, def.y, FZ + 0.8);
+            dot.scale.set(2.5, 2.5, 1);
+            this.scene.add(dot);
+            this._strataSprites.push(dot);
+          }
+          this._setupWellLabels();
+        }
+        _setupWellLabels() {
+          const style = `
+            .well-label {
+                padding: 3px 10px;
+                background: rgba(10,10,24,0.82);
+                border: 1px solid #ffcc55;
+                border-left: 3px solid #ffcc55;
+                border-radius: 3px;
+                font-family: 'Courier New', monospace;
+                font-size: 11px;
+                color: #ffe8a0;
+                white-space: nowrap;
+                pointer-events: none;
+                backdrop-filter: blur(2px);
+            }
+        `;
+          if (!document.getElementById("well-label-style")) {
+            const styleEl = document.createElement("style");
+            styleEl.id = "well-label-style";
+            styleEl.textContent = style;
+            document.head.appendChild(styleEl);
+          }
+          const landEl = document.createElement("div");
+          landEl.className = "well-label";
+          landEl.textContent = "\u{1F6E2} \u9646\u5730\u6CB9\u4E95 Land Well";
+          const landLabel = new CSS2DObject(landEl);
+          landLabel.position.set(55, 20, 56);
+          this.scene.add(landLabel);
+          const offshoreEl = document.createElement("div");
+          offshoreEl.className = "well-label";
+          offshoreEl.textContent = "\u{1F6E2} \u6D77\u4E0A\u5E73\u53F0 Offshore Platform";
+          const offshoreLabel = new CSS2DObject(offshoreEl);
+          offshoreLabel.position.set(-65, 26, 5);
+          this.scene.add(offshoreLabel);
+        }
+        /** 生成文字标签 Plane（Canvas 绘制，法线朝 Z+，随正剖面旋转） */
+        _makeStrataSprite(text, textColor, borderColor) {
+          const W = 256, H = 56;
+          const canvas = document.createElement("canvas");
+          canvas.width = W;
+          canvas.height = H;
+          const ctx = canvas.getContext("2d");
+          ctx.fillStyle = "rgba(2,6,16,0.94)";
+          this._roundRect(ctx, 0, 0, W, H, 6);
+          ctx.fill();
+          ctx.fillStyle = borderColor;
+          this._roundRect(ctx, 0, 0, 5, H, [6, 0, 0, 6]);
+          ctx.fill();
+          ctx.strokeStyle = borderColor;
+          ctx.lineWidth = 2;
+          this._roundRect(ctx, 1, 1, W - 2, H - 2, 6);
+          ctx.stroke();
+          ctx.font = 'bold 24px "Arial", sans-serif';
+          ctx.fillStyle = textColor;
+          ctx.textBaseline = "middle";
+          ctx.fillText(text, 14, H / 2);
+          const tex = new CanvasTexture(canvas);
+          const mat = new MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            side: FrontSide,
+            depthWrite: false,
+            depthTest: true
+          });
+          const geo = new PlaneGeometry(1, 1);
+          return new Mesh(geo, mat);
+        }
+        /** 生成横线 Plane */
+        _makeLineSprite(color) {
+          const W = 128, H = 4;
+          const canvas = document.createElement("canvas");
+          canvas.width = W;
+          canvas.height = H;
+          const ctx = canvas.getContext("2d");
+          const grad = ctx.createLinearGradient(0, 0, W, 0);
+          grad.addColorStop(0, color + "88");
+          grad.addColorStop(0.5, color);
+          grad.addColorStop(1, color);
+          ctx.fillStyle = grad;
+          ctx.fillRect(0, 0, W, H);
+          const tex = new CanvasTexture(canvas);
+          const mat = new MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            side: FrontSide,
+            depthWrite: false,
+            depthTest: true
+          });
+          const geo = new PlaneGeometry(1, 1);
+          return new Mesh(geo, mat);
+        }
+        /** 生成终点圆点 Plane */
+        _makeDotSprite(color) {
+          const SZ = 32;
+          const canvas = document.createElement("canvas");
+          canvas.width = SZ;
+          canvas.height = SZ;
+          const ctx = canvas.getContext("2d");
+          ctx.beginPath();
+          ctx.arc(SZ / 2, SZ / 2, SZ / 2 - 2, 0, Math.PI * 2);
+          ctx.fillStyle = color;
+          ctx.fill();
+          const tex = new CanvasTexture(canvas);
+          const mat = new MeshBasicMaterial({
+            map: tex,
+            transparent: true,
+            side: FrontSide,
+            depthWrite: false,
+            depthTest: true
+          });
+          const geo = new PlaneGeometry(1, 1);
+          return new Mesh(geo, mat);
+        }
+        /** canvas 圆角矩形辅助 */
+        _roundRect(ctx, x, y, w, h, r) {
+          if (typeof r === "number") r = [r, r, r, r];
+          ctx.beginPath();
+          ctx.moveTo(x + r[0], y);
+          ctx.lineTo(x + w - r[1], y);
+          ctx.quadraticCurveTo(x + w, y, x + w, y + r[1]);
+          ctx.lineTo(x + w, y + h - r[2]);
+          ctx.quadraticCurveTo(x + w, y + h, x + w - r[2], y + h);
+          ctx.lineTo(x + r[3], y + h);
+          ctx.quadraticCurveTo(x, y + h, x, y + h - r[3]);
+          ctx.lineTo(x, y + r[0]);
+          ctx.quadraticCurveTo(x, y, x + r[0], y);
+          ctx.closePath();
+        }
+        _updateStrataLabels() {
         }
         bindEvents() {
           this.container.querySelector("#resetViewBtn")?.addEventListener("click", () => {
@@ -45040,6 +45253,7 @@ void main() {
           this.controls.update();
           this.composer.render();
           this.css2dRenderer.render(this.scene, this.camera);
+          this._updateStrataLabels();
         }
         _applyKeyboardPan(dt) {
           const keys = this.state.keys;

@@ -37,21 +37,19 @@ const S = {
     lithBottom: -15,
 
     // 地下分层边界（从下往上）
-    basementBottom: -80,   // 基底岩石底
-    basementTop:    -65,   // 基底岩石顶 / 不透水底层底
-    waterproofBottom: -65, // 不透水底层底
-    waterproofTop:    -50, // 不透水底层顶 / 储集层底
-    reservoirBottom:  -50, // 储集层底（地层水底）
-    reservoirTop:     -28, // 储集层顶（拱顶顶部）
-    capRockBottom:    -28, // 盖层底
+    basementBottom: -95,   // 基底岩石底（要足够深，容纳储集层底面最深 -80）
+    basementTop:    -80,   // 基底岩石顶 / 不透水底层底
+    waterproofBottom: -80, // 不透水底层底
+    waterproofTop:    -63, // 不透水底层顶（向斜处平均储集层底，实际动态）
+    reservoirBottom:  -63, // 储集层底（动态函数 reservoirBottomAt 的平均基准）
+    reservoirTop:     -28, // 储集层顶（拱顶顶部，盖层底面）
+    capRockBottom:    -28, // 盖层底（与储集层顶面衔接，动态弯曲）
     capRockTop:       -15, // 盖层顶 / 浅层砂岩底
     surfaceRockTop:     0, // 浅层砂岩顶（地表）
 
-    // 储集层内三分：water/oil/gas 边界
-    // 地层水在底部，石油在中间，天然气在拱顶
-    // 这些是"平均"高度，实际储集层面随拱形波动
-    waterOilBound:  -43,   // 水-油边界（在储集层内，向上）
-    oilGasBound:    -36,   // 油-气边界（拱顶附近）
+    // 油水/油气分界（固定水平线，仅供标签参考；实际分界由 waterOilBoundAt/oilGasBoundAt 计算）
+    waterOilBound:  -44,   // 固定油水界面 Y（= OIL_WATER_LEVEL）
+    oilGasBound:    -34,   // 固定油气界面 Y（= OIL_GAS_LEVEL）
 
     ridgeX: -75,
     coastMeanX: 0,
@@ -76,6 +74,14 @@ function clamp(value, min, max) {
 
 function mix(a, b, t) {
     return a + (b - a) * t;
+}
+
+/** 与水面网格完全相同的波浪公式，用于竖直剖面海水上边界对齐 */
+function seaWaveAt(x, z) {
+    return Math.sin(x * 0.18 + z * 0.11) * 0.90
+         + Math.sin(x * 0.31 - z * 0.19) * 0.55
+         + Math.sin(x * 0.07 + z * 0.25) * 0.35
+         + Math.cos(x * 0.24 - z * 0.08) * 0.20;
 }
 
 function smoothstep(edge0, edge1, value) {
@@ -153,6 +159,23 @@ function indiaEastCoast(z) {
 }
 
 /* ============================================================
+   地壳下界
+   - 陆地/海湾区域：Y=0 上下波动（±2）
+   - 海洋区域：Y=-13 上下轻微波动（±1.5）
+   - 海岸线附近 smoothstep 圆滑过渡
+============================================================ */
+function crustBottomAt(x, z) {
+    const shore = indiaWestCoast(z);
+    // 过渡区：从海岸线 shore（约X=-30）到 X=0，x < shore 时 t=0（海洋），x > 0 时 t=1（陆地/海湾）
+    const t = smoothstep(shore, 0, x); // 0=海洋, 1=陆地/海湾
+    const landWave  = fbmNoise(x * 0.05 + 1.3, z * 0.05 - 0.7, 3, 0.06, 0.5) * 3.0;  // ±3 波动
+    const oceanWave = fbmNoise(x * 0.06 - 2.1, z * 0.06 + 3.4, 3, 0.04, 0.5) * 1.5;  // ±1.5 波动
+    const landBot  = -6 + landWave;   // 陆地/海湾：Y=-6 附近
+    const oceanBot = -13 + oceanWave; // 海洋：Y=-13 附近
+    return mix(oceanBot, landBot, t);
+}
+
+/* ============================================================
    海底高度
 ============================================================ */
 function oceanFloorHeight(x, z) {
@@ -162,8 +185,8 @@ function oceanFloorHeight(x, z) {
     const trenchCenter = shore - 6.0 + Math.sin(z * 0.11 + 0.8) * 1.6;
 
     const abyssalPlain = mix(-8.5, -10.0, smoothstep(0.14, 0.84, nx));
-    const ridgeMass    = 11.5 * gaussian(x, ridgeCenter, 7.8);
-    const ridgeShoulder = 4.5 * gaussian(x, ridgeCenter, 17.0);
+    const ridgeMass    = 7.0 * gaussian(x, ridgeCenter, 7.8);
+    const ridgeShoulder = 3.0 * gaussian(x, ridgeCenter, 17.0);
     const centralBasin = -1.5 * gaussian(x, mix(S.ridgeX + 16, shore - 26, 0.55), 15.0);
     const slopeRise    = 5.5 * smoothstep(shore - 28, shore - 9, x);
     const trench       = -6.0 * gaussian(x, trenchCenter, 4.2);
@@ -349,56 +372,126 @@ function waterSurfaceHeight(x, z) {
 
 /* ============================================================
    ★ 地下储集层波浪形状函数
-   按图，储集层（含水/油/气）呈波浪形拱起，有两个背斜拱顶
-   左拱（陆地下方）和右拱（海洋/大陆架下方）
-   返回：给定 x 位置的储集层内部界面偏移量（拱起高度）
+   最终正确设计：
+   - 储集层顶面（盖层底面）= 纯粹弯曲的波浪线，完全不截断，确保是弧线
+   - 储集层底面（不透水层顶面）= 小幅度波浪，约为顶面幅度的 1/2，
+     使拱顶处层厚（约 18）、向斜处层薄（约 8）
+   - 油水界面 = 固定绝对 Y 值（真正的水平线）← 地质科学：浮力使界面水平
+   - 油气界面 = 固定绝对 Y 值（真正的水平线）← 气最轻，始终在最顶部
+   - 颜色判断：某点 y 落在哪段区间 → 决定是水/油/气
+     * y < OIL_WATER_LEVEL  → 含水层（地层水）
+     * OIL_WATER_LEVEL ≤ y < OIL_GAS_LEVEL → 石油层
+     * y ≥ OIL_GAS_LEVEL   → 天然气层
+     （前提：y 在 reservoirBottom ~ reservoirTop 之间，即在储集层内）
+   - 只有当储集层顶面高于 OIL_WATER_LEVEL 时，该拱顶区域才会出现石油
+   - 只有当储集层顶面高于 OIL_GAS_LEVEL 时，该拱顶区域才会出现天然气
+   - 两个背斜拱顶：左拱 x≈-65（海洋），右拱 x≈55（大陆）
 ============================================================ */
-function reservoirArch(x, z) {
-    // 两个背斜拱顶：左拱中心约 x=-20，右拱中心约 x=60
-    const arch1 = gaussian(x, -20, 30) * 16.0;  // 左拱，幅度16，宽30
-    const arch2 = gaussian(x, 62, 28) * 14.0;   // 右拱，幅度14，宽28
-    // 额外的小起伏（地层不平）
-    const undulation = fbmNoise(x * 0.04, z * 0.03, 3, 0.04, 0.5) * 3.0
-                     + Math.sin(x * 0.025 + z * 0.018) * 2.5;
-    return arch1 + arch2 + undulation;
+
+// ── 共享波浪驱动函数 ──────────────────────────────────────────
+// 两个高斯拱顶 + 向斜谷 + 自然不规则起伏
+// 拱顶峰值 wave ≈ +28~32，向斜谷 ≈ -10，平坦区 ≈ 0
+function reservoirWave(x, z) {
+    const arch1   = gaussian(x, -65, 24) * 32.0;   // 左拱（海洋）
+    const arch2   = gaussian(x,  55, 22) * 30.0;   // 右拱（大陆，幅度30）
+    const valley  = -gaussian(x, -10, 22) * 12.0;  // 两拱间向斜谷
+    const undulation = Math.sin(x * 0.022 + 0.8) * 3.0
+                     + Math.sin(x * 0.048 - 1.4) * 1.5
+                     + fbmNoise(x * 0.03, z * 0.02, 2, 0.025, 0.5) * 1.8;
+    return arch1 + arch2 + valley + undulation;
 }
 
-// 储集层顶面高度（拱顶）
+// ── 储集层顶面（大幅度波浪，不截断上限，确保是纯弧线）────────
+// 拱顶处顶面需高于 OIL_WATER_LEVEL(-30) 才有油气，且不能穿透盖层顶(-15)
+// 基准 -55，wave系数 1.0（大幅度）
+//   拱顶（wave≈+30）：top = -55+30 = -25  →  顶面弧顶 -25，高于油水界面-30，有油气
+//   向斜（wave≈-10）：top = -55-10 = -65  →  深埋，低于 -30，全是水
+//   平坦（wave≈ 0）：top = -55            →  低于 -30，全是水
+// 关键：不设上限，顶面自由弯曲，保证是弧线！
+const RES_TOP_BASE = -55.0;
 function reservoirTopAt(x, z) {
-    const arch = reservoirArch(x, z);
-    // 拱顶可以侵入盖层（盖层下部随储集层相应变形）
-    return clamp(S.reservoirTop + arch, S.reservoirBottom + 1.0, S.capRockTop - 2.0);
+    const wave = reservoirWave(x, z);
+    // 不设上限，让弧线自由弯曲；只设下限防止穿透地球
+    return Math.max(RES_TOP_BASE + wave, -72.0);
 }
 
-// 不透水底层顶面高度（与储集层底面一致，随拱形略有起伏）
-function waterproofTopAt(x, z) {
-    // 不透水层顶面也稍微跟随拱形（岩层同步弯曲）
-    const arch = reservoirArch(x, z) * 0.65;
-    return clamp(S.waterproofTop + arch, S.basementTop + 0.5, S.reservoirBottom + 15.0);
-}
-
-// 储集层底面高度（不透水层顶 = 储集层底）
+// ── 储集层底面（动态幅度波浪）────────────────────────────────
+// 设计目标：
+//   - 接近最低端（向斜谷，wave 小）时底面波动幅度小，层厚变薄
+//   - 接近最高端（拱顶，wave 大）时底面波动幅度大，层厚增大
+//   - 左拱（海洋，x≈-65）和右拱（大陆，x≈55）有不同的幅度系数
+//
+// 实现方式：
+//   1. wave 归一化到 [0,1]（wave_min≈-12，wave_max≈32，range=44）
+//   2. 幅度系数 = mix(低幅系数, 高幅系数, 归一化wave)  → 越高越大
+//   3. 左拱用较大幅度系数（海洋拱顶更宽），右拱用中等幅度系数
+//   4. 用高斯权重混合左右拱顶的幅度，使过渡自然
+//
+// 效果：
+//   向斜谷（wave≈-10）：幅度系数≈0.15 → bot≈-70+(-10×0.15)=-71.5，层薄≈6.5
+//   平坦区（wave≈ 0）：幅度系数≈0.28 → bot=-70，层厚=15
+//   右拱顶（wave≈+30）：幅度系数≈0.55 → bot≈-70+(30×0.55)=-53.5，层厚≈28.5
+//   左拱顶（wave≈+32）：幅度系数≈0.85 → bot≈-70+(32×0.85)=-42.8，层厚≈24.2（底面上移6.4）
+//   底面 wave 使用 x+10 计算，拱形整体向左平移10单位
+const RES_BOT_BASE = -70.0;
 function reservoirBottomAt(x, z) {
-    return waterproofTopAt(x, z);
+    // 底面拱形向左平移 5 个单位（偏移量可调），使底面与顶面错位，产生向左倾斜感
+    const wave = reservoirWave(x + 5, z);
+
+    // wave 归一化：wave_min=-12，wave_max=32（峰值），映射到 [0,1]
+    const waveNorm = clamp((wave - (-12.0)) / (32.0 - (-12.0)), 0.0, 1.0);
+
+    // 左拱（x≈-65）：幅度从低端0.15渐增到高端0.92（海洋侧拱顶底面再上移）
+    const ampLeft  = mix(0.15, 0.92, waveNorm);
+    // 右拱（x≈55）：幅度从低端0.15渐增到高端0.50（大陆侧拱顶稍平缓）
+    const ampRight = mix(0.15, 0.50, waveNorm);
+
+    // 用高斯权重在两拱顶之间平滑混合幅度系数
+    const wLeft  = gaussian(x, -65, 35);   // 左拱影响范围（宽35）
+    const wRight = gaussian(x,  55, 30);   // 右拱影响范围（宽30）
+    const wSum   = wLeft + wRight + 1e-6;
+    const amp    = (wLeft * ampLeft + wRight * ampRight) / wSum
+                 + (1.0 - clamp(wLeft + wRight, 0, 1)) * mix(0.15, 0.45, waveNorm);
+    // 最后一项：远离两拱顶的中间区域使用中间幅度
+
+    return Math.max(RES_BOT_BASE + wave * amp, -82.0);
 }
 
-// 油水边界面高度（在储集层内，水在底部，油在上方）
+// 不透水底层顶面 = 储集层底面（紧贴）
+function waterproofTopAt(x, z) {
+    return reservoirBottomAt(x, z);
+}
+
+// ── 油水界面 & 油气界面：真正的固定水平线 ─────────────────────
+// 地质科学原理：液体受浮力，油水/油气界面永远水平
+// 只有某位置的储集层顶面高于对应界面，该区域才聚集油/气
+//
+// 设置（与 RES_TOP_BASE=-55，arch_peak≈+30 对应）：
+//   拱顶顶面最高 ≈ -55+30 = -25
+//   OIL_GAS_LEVEL = -34   → 顶面(-25) 比气界面(-34) 高 9，有天然气（气层厚9）
+//   OIL_WATER_LEVEL = -44 → 顶面(-25) 比油水界面(-44) 高 19，有石油（油层厚10，气层厚9）
+//   拱顶以外（顶面 ≤ -44）：全是地层水
+const OIL_WATER_LEVEL = -44.0;   // 固定水平油水界面（Y 坐标）
+const OIL_GAS_LEVEL   = -34.0;   // 固定水平油气界面（Y 坐标）
+
+// waterOilBoundAt / oilGasBoundAt 用于几何体裁剪时确定上下顶点位置
+// 返回在储集层内部被水平界面截断后的实际 Y 值
 function waterOilBoundAt(x, z) {
-    const archBottom = reservoirBottomAt(x, z);
-    const archTop    = reservoirTopAt(x, z);
-    const thickness  = archTop - archBottom;
-    // 水层占储集层下方约 35%
-    return archBottom + thickness * 0.35;
+    const top = reservoirTopAt(x, z);
+    const bot = reservoirBottomAt(x, z);
+    // 储集层顶面低于油水界面 → 全是水，"界面"贴着顶面（油厚度=0）
+    if (top <= OIL_WATER_LEVEL) return top;
+    // 否则油水界面就是固定水平值，夹在底面和顶面之间
+    return clamp(OIL_WATER_LEVEL, bot, top);
 }
 
-// 油气边界面高度（油在中间，气在拱顶）
 function oilGasBoundAt(x, z) {
-    const archBottom = reservoirBottomAt(x, z);
-    const archTop    = reservoirTopAt(x, z);
-    const thickness  = archTop - archBottom;
-    // 油层占储集层约 35%（从水油边界到油气边界）
-    // 气层在最顶部约 30%
-    return archBottom + thickness * 0.70;
+    const top = reservoirTopAt(x, z);
+    const bot = reservoirBottomAt(x, z);
+    // 储集层顶面低于油气界面 → 无天然气，"界面"贴着顶面（气厚度=0）
+    if (top <= OIL_GAS_LEVEL) return top;
+    // 否则油气界面就是固定水平值
+    return clamp(OIL_GAS_LEVEL, bot, top);
 }
 
 /* ============================================================
@@ -742,25 +835,50 @@ function createShorelineFoam() {
    水面形状
 ============================================================ */
 function createOceanWaterSurface(materialOptions = {}) {
-    const shorelineSamples = 84;
-    const shape = new THREE.Shape();
-    shape.moveTo(S.xMin, S.backZ);
-    shape.lineTo(S.xMin, S.frontZ);
-    for (let i = 0; i <= shorelineSamples; i++) {
-        const t = i / shorelineSamples;
-        const z = mix(S.frontZ, S.backZ, t);
-        const x = indiaWestCoast(z) + 0.7;
-        shape.lineTo(x, z);
-    }
-    shape.closePath();
+    // 每行以当前 z 的海岸线为右边界，动态裁切，彻底不生成陆地区域顶点
+    const xMin = S.xMin;
+    const zMin = S.backZ, zMax = S.frontZ;
+    const nx = 120, nz = 80;
+    const dz = (zMax - zMin) / nz;
 
-    const geometry = new THREE.ShapeGeometry(shape, 240);
-    const positions = geometry.getAttribute('position');
-    for (let i = 0; i < positions.count; i++) {
-        const x = positions.getX(i), z = positions.getY(i);
-        positions.setXYZ(i, x, S.seaLevel, z);
+    const posArr = [];
+    const idxArr = [];
+    // rowStart[iz] = 该行第一个顶点在 posArr 中的索引（以顶点为单位）
+    const rowStart = new Int32Array(nz + 1);
+    let vtx = 0;
+
+    for (let iz = 0; iz <= nz; iz++) {
+        const z = zMin + iz * dz;
+        const shore = indiaWestCoast(z) + 0.7; // 该行的海岸线右边界
+        const xMax = shore;
+        const dx = (xMax - xMin) / nx;
+        rowStart[iz] = vtx;
+        for (let ix = 0; ix <= nx; ix++) {
+            const x = xMin + ix * dx;
+            // 全部在海洋内，直接计算波浪高度
+            const y = S.seaLevel
+                + Math.sin(x * 0.18 + z * 0.11) * 0.90
+                + Math.sin(x * 0.31 - z * 0.19) * 0.55
+                + Math.sin(x * 0.07 + z * 0.25) * 0.35
+                + Math.cos(x * 0.24 - z * 0.08) * 0.20;
+            posArr.push(x, y, z);
+            vtx++;
+        }
     }
-    positions.needsUpdate = true;
+    // 每行都有 nx+1 个顶点，相邻行之间连接四边形
+    for (let iz = 0; iz < nz; iz++) {
+        for (let ix = 0; ix < nx; ix++) {
+            const a = rowStart[iz]     + ix;
+            const b = rowStart[iz]     + ix + 1;
+            const c = rowStart[iz + 1] + ix;
+            const d = rowStart[iz + 1] + ix + 1;
+            idxArr.push(a, c, b, b, c, d);
+        }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+    geometry.setIndex(idxArr);
     geometry.computeVertexNormals();
     assignVertexColors(geometry, (x, y, z) => waterColorAt(x, y, z));
 
@@ -776,30 +894,44 @@ function createOceanWaterSurface(materialOptions = {}) {
 }
 
 function createBayWaterSurface(materialOptions = {}) {
-    const samples = 80;
-    const shape = new THREE.Shape();
-    for (let i = 0; i <= samples; i++) {
-        const t = i / samples;
-        const z = mix(S.backZ, S.frontZ, t);
-        const x = indiaEastCoast(z) + 0.3;
-        if (i === 0) shape.moveTo(x, z);
-        else shape.lineTo(x, z);
-    }
-    for (let i = samples; i >= 0; i--) {
-        const t = i / samples;
-        const z = mix(S.backZ, S.frontZ, t);
-        const x = indiaEastCoast(z) + 5.0;
-        shape.lineTo(x, z);
-    }
-    shape.closePath();
+    // 均匀网格，海湾范围 x: eastCoast ~ eastCoast+5
+    const zMin = S.backZ, zMax = S.frontZ;
+    const nx = 30, nz = 80;
+    const dz = (zMax - zMin) / nz;
 
-    const geometry = new THREE.ShapeGeometry(shape, 160);
-    const positions = geometry.getAttribute('position');
-    for (let i = 0; i < positions.count; i++) {
-        const x = positions.getX(i), z = positions.getY(i);
-        positions.setXYZ(i, x, S.seaLevel, z);
+    const vertCount = (nx + 1) * (nz + 1);
+    const posArr = new Float32Array(vertCount * 3);
+    const idxArr = [];
+
+    for (let iz = 0; iz <= nz; iz++) {
+        for (let ix = 0; ix <= nx; ix++) {
+            const z = zMin + iz * dz;
+            const xLeft  = indiaEastCoast(z) + 0.3;
+            const xRight = indiaEastCoast(z) + 5.0;
+            const x = mix(xLeft, xRight, ix / nx);
+            const wave =
+                Math.sin(x * 0.18 + z * 0.11) * 0.70
+                + Math.sin(x * 0.31 - z * 0.19) * 0.40
+                + Math.cos(x * 0.24 - z * 0.08) * 0.25;
+            const vi = (iz * (nx + 1) + ix) * 3;
+            posArr[vi]     = x;
+            posArr[vi + 1] = S.seaLevel + wave;
+            posArr[vi + 2] = z;
+        }
     }
-    positions.needsUpdate = true;
+    for (let iz = 0; iz < nz; iz++) {
+        for (let ix = 0; ix < nx; ix++) {
+            const a = iz * (nx + 1) + ix;
+            const b = a + 1;
+            const c = a + (nx + 1);
+            const d = c + 1;
+            idxArr.push(a, c, b, b, c, d);
+        }
+    }
+
+    const geometry = new THREE.BufferGeometry();
+    geometry.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+    geometry.setIndex(idxArr);
     geometry.computeVertexNormals();
     assignVertexColors(geometry, (x, y, z) => bayWaterColorAt(x, y, z));
 
@@ -951,23 +1083,21 @@ function createFrontProfilePanel(textures) {
     gasZoneMesh.position.z = z + 0.04;
     group.add(gasZoneMesh);
 
-    /* 4. 盖层（Cap Rock，Y: -28 ~ -15，深棕致密） */
-    // 盖层底面跟随储集层顶面，顶面平
+    /* 4. 盖层（Cap Rock，底面跟随储集层顶，顶面动态取 min(terrainHeight, capRockTop)） */
     const capSegs = 200;
-    const capBottomPts = [];
+    const capTopPts = [], capBottomPts = [];
     for (let i = 0; i <= capSegs; i++) {
         const t = i / capSegs;
         const x = mix(S.xMin, S.xMax, t);
+        capTopPts.push(new THREE.Vector2(x, Math.min(terrainHeightAt(x, z), S.capRockTop)));
         capBottomPts.push(new THREE.Vector2(x, reservoirTopAt(x, z)));
     }
     const capRockShape = new THREE.Shape();
-    capRockShape.moveTo(S.xMin, S.capRockTop);
-    capRockShape.lineTo(S.xMax, S.capRockTop);
-    for (let i = capSegs; i >= 0; i--) {
-        capRockShape.lineTo(capBottomPts[i].x, capBottomPts[i].y);
-    }
+    capRockShape.moveTo(capTopPts[0].x, capTopPts[0].y);
+    for (let i = 1; i <= capSegs; i++) capRockShape.lineTo(capTopPts[i].x, capTopPts[i].y);
+    for (let i = capSegs; i >= 0; i--) capRockShape.lineTo(capBottomPts[i].x, capBottomPts[i].y);
     capRockShape.closePath();
-    const capRockGeo = new THREE.ShapeGeometry(capRockShape, 140);
+    const capRockGeo = new THREE.ShapeGeometry(capRockShape, 160);
     capRockGeo.computeVertexNormals();
     assignVertexColors(capRockGeo, (x, y) => capRockColor(x, y, z));
     const capRockMesh = new THREE.Mesh(capRockGeo, new THREE.MeshStandardMaterial({
@@ -977,75 +1107,99 @@ function createFrontProfilePanel(textures) {
     capRockMesh.position.z = z + 0.05;
     group.add(capRockMesh);
 
-    /* 5. 浅层砂岩/土层（Y: -15 ~ 0，沙黄色） */
-    const surfaceRockShape = new THREE.Shape();
-    surfaceRockShape.moveTo(S.xMin, S.lithBottom);
-    surfaceRockShape.lineTo(S.xMax, S.lithBottom);
-    surfaceRockShape.lineTo(S.xMax, S.surfaceRockTop);
-    surfaceRockShape.lineTo(S.xMin, S.surfaceRockTop);
-    surfaceRockShape.closePath();
-    const surfaceRockGeo = new THREE.ShapeGeometry(surfaceRockShape, 80);
-    surfaceRockGeo.computeVertexNormals();
-    assignVertexColors(surfaceRockGeo, (x, y) => surfaceRockColor(x, y, z));
-    const surfaceRockMesh = new THREE.Mesh(surfaceRockGeo, new THREE.MeshStandardMaterial({
-        vertexColors: true, roughness: 0.90, metalness: 0.01,
-        side: THREE.DoubleSide,
-    }));
-    surfaceRockMesh.position.z = z + 0.06;
-    group.add(surfaceRockMesh);
+    /* 5 & 6. 浅层砂岩 + 地壳（使用 BufferGeometry 条带，共享 crustBottomAt 逐点采样，确保上下界精确对齐） */
+    {
+        const segsLC = 300; // 每层采样列数
+        // 预先逐点计算三条边界（共享 x 坐标）
+        const xs        = new Float32Array(segsLC + 1);
+        const botFlat   = new Float32Array(segsLC + 1); // 浅层砂岩下界（固定 lithBottom）
+        const midBound  = new Float32Array(segsLC + 1); // 分界线 = crustBottomAt（浅层砂岩上界 = 地壳下界）
+        const topTerr   = new Float32Array(segsLC + 1); // 地壳上界（terrain）
 
-    /* 6. 地壳剖面（从 lithBottom/surfaceRockTop=0 到地形表面） */
-    const crustShape = new THREE.Shape();
-    crustShape.moveTo(S.xMin, S.surfaceRockTop);
-    for (let i = 0; i <= segs; i++) {
-        crustShape.lineTo(profilePoints[i].x, profilePoints[i].y);
-    }
-    crustShape.lineTo(S.xMax, S.surfaceRockTop);
-    crustShape.closePath();
-
-    const crustGeo = new THREE.ShapeGeometry(crustShape, 300);
-    crustGeo.computeVertexNormals();
-    assignVertexColors(crustGeo, (x, y) => {
-        const westShore = indiaWestCoast(z);
-        const eastShore = indiaEastCoast(z);
-        const bayEnd = eastShore + 5.0;
-        if (x < westShore) return oceanCrustColorAt(x, y);
-        else if (x < eastShore) return continentCrustColorAt(x, y);
-        else if (x < bayEnd) {
-            const subductT = clamp((y - S.lithBottom) / (-S.lithBottom + S.seaLevel), 0, 1);
-            return new THREE.Color(
-                mix(0.48, 0.72, subductT),
-                mix(0.14, 0.32, subductT),
-                mix(0.10, 0.22, subductT)
-            );
-        } else {
-            return continentCrustColorAt(x, y);
+        for (let i = 0; i <= segsLC; i++) {
+            const x = mix(S.xMin, S.xMax, i / segsLC);
+            xs[i]       = x;
+            botFlat[i]  = S.lithBottom;
+            const cBot  = crustBottomAt(x, z);
+            const cTop  = terrainHeightAt(x, z);
+            midBound[i] = cBot;
+            topTerr[i]  = cTop;
         }
-    });
-    const crustMesh = new THREE.Mesh(crustGeo, new THREE.MeshStandardMaterial({
-        vertexColors: true, roughness: 0.88, metalness: 0.03,
-        emissive: new THREE.Color(0x1b1004), emissiveIntensity: 0.12,
-        side: THREE.DoubleSide,
-    }));
-    crustMesh.position.z = z + 0.07;
-    group.add(crustMesh);
+
+        // 通用：将两排点（bot[i], top[i]）构建为条带三角形 BufferGeometry
+        // 当某列 yT <= yB 时（厚度=0或倒置），跳过该列的三角形，避免闪烁
+        function buildStripGeo(xArr, botArr, topArr, colorFn) {
+            const n = xArr.length;
+            const posArr = [], colArr = [], idxArr = [];
+            // 每列对应两个顶点的起始索引（-1 表示该列被跳过）
+            const colVtx = new Int32Array(n).fill(-1);
+            let vtx = 0;
+            for (let i = 0; i < n; i++) {
+                const x  = xArr[i];
+                const yB = botArr[i];
+                const yT = topArr[i];
+                if (yT - yB < 0.001) continue; // 厚度过小跳过
+                colVtx[i] = vtx;
+                posArr.push(x, yB, 0,  x, yT, 0);
+                const cB = colorFn(x, yB);
+                colArr.push(cB.r, cB.g, cB.b);
+                const cT = colorFn(x, yT);
+                colArr.push(cT.r, cT.g, cT.b);
+                vtx += 2;
+            }
+            // 只在相邻两列都有效时生成三角形
+            for (let i = 0; i < n - 1; i++) {
+                const a = colVtx[i], b = colVtx[i + 1];
+                if (a < 0 || b < 0) continue;
+                idxArr.push(a, a+1, b,  a+1, b+1, b);
+            }
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+            geo.setAttribute('color',    new THREE.Float32BufferAttribute(colArr, 3));
+            geo.setIndex(idxArr);
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        // 5. 浅层砂岩：下界 lithBottom → 上界 midBound（= crustBottomAt）
+        const srGeo = buildStripGeo(xs, botFlat, midBound, (x, y) => surfaceRockColor(x, y, z));
+        const srMesh = new THREE.Mesh(srGeo, new THREE.MeshStandardMaterial({
+            vertexColors: true, roughness: 0.90, metalness: 0.01, side: THREE.DoubleSide,
+        }));
+        srMesh.position.z = z - 0.1;
+        group.add(srMesh);
+
+        // 6. 地壳：下界 midBound（= crustBottomAt）→ 上界 topTerr（terrain）
+        const crColor = new THREE.Color(0.28, 0.28, 0.30);
+        const crGeo = buildStripGeo(xs, midBound, topTerr, () => crColor);
+        const crMesh = new THREE.Mesh(crGeo, new THREE.MeshStandardMaterial({
+            vertexColors: true, roughness: 0.88, metalness: 0.01, side: THREE.DoubleSide,
+        }));
+        // 地壳 position.z 稍微靠后于地面前端（frontZ=56），让地面高度场能完整覆盖地壳顶部边缘
+        crMesh.position.z = z - 0.1;
+        crMesh.renderOrder = 2; // 渲染顺序低于水体（5），水体始终覆盖在地壳上
+        group.add(crMesh);
+    }
 
     /* 7. 海水层 */
     const westShore = indiaWestCoast(z);
     const eastShore = indiaEastCoast(z);
     const bayEnd = eastShore + 5.0;
 
-    // 大洋水体
+    // 大洋水体（上边界跟随波浪起伏，与水面网格对齐）
+    const owSegs = 150;
     const oceanWaterShape = new THREE.Shape();
-    oceanWaterShape.moveTo(S.xMin, S.seaLevel);
-    oceanWaterShape.lineTo(westShore, S.seaLevel);
-    for (let i = segs; i >= 0; i--) {
-        const t = i / segs;
-        const x = mix(S.xMin, S.xMax, t);
-        if (x >= S.xMin && x <= westShore) {
-            const y = Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1);
-            oceanWaterShape.lineTo(x, y);
-        }
+    // 上边界：从左向右逐点采样波浪高度
+    oceanWaterShape.moveTo(S.xMin, S.seaLevel + seaWaveAt(S.xMin, z));
+    for (let i = 1; i <= owSegs; i++) {
+        const x = mix(S.xMin, westShore, i / owSegs);
+        oceanWaterShape.lineTo(x, S.seaLevel + seaWaveAt(x, z));
+    }
+    // 下边界：从右向左逐点采样海底高度（clamp 防止超出模型底面）
+    for (let i = owSegs; i >= 0; i--) {
+        const x = mix(S.xMin, westShore, i / owSegs);
+        const y = Math.max(Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1), S.basementBottom);
+        oceanWaterShape.lineTo(x, y);
     }
     oceanWaterShape.closePath();
     const oceanWaterGeo = new THREE.ShapeGeometry(oceanWaterShape, 150);
@@ -1061,17 +1215,20 @@ function createFrontProfilePanel(textures) {
     oceanWaterMesh.renderOrder = 5;
     group.add(oceanWaterMesh);
 
-    // 海湾水体
+    // 海湾水体（上边界跟随波浪起伏）
+    const bwSegs = 60;
     const bayWaterShape = new THREE.Shape();
-    bayWaterShape.moveTo(eastShore, S.seaLevel);
-    bayWaterShape.lineTo(bayEnd, S.seaLevel);
-    for (let i = segs; i >= 0; i--) {
-        const t = i / segs;
-        const x = mix(S.xMin, S.xMax, t);
-        if (x >= eastShore && x <= bayEnd) {
-            const y = Math.min(bayBedHeight(x, z), S.seaLevel - 0.1);
-            bayWaterShape.lineTo(x, y);
-        }
+    // 上边界从左到右
+    bayWaterShape.moveTo(eastShore, S.seaLevel + seaWaveAt(eastShore, z));
+    for (let i = 1; i <= bwSegs; i++) {
+        const x = mix(eastShore, bayEnd, i / bwSegs);
+        bayWaterShape.lineTo(x, S.seaLevel + seaWaveAt(x, z));
+    }
+    // 下边界从右到左（clamp 防止超出模型底面）
+    for (let i = bwSegs; i >= 0; i--) {
+        const x = mix(eastShore, bayEnd, i / bwSegs);
+        const y = Math.max(Math.min(bayBedHeight(x, z), S.seaLevel - 0.1), S.basementBottom);
+        bayWaterShape.lineTo(x, y);
     }
     bayWaterShape.closePath();
     const bayWaterGeo = new THREE.ShapeGeometry(bayWaterShape, 60);
@@ -1248,63 +1405,97 @@ function createBackProfilePanel() {
     gMesh.position.z = z - 0.04;
     group.add(gMesh);
 
-    /* 盖层 */
-    const capBottomPts = [];
-    for (let i = 0; i <= segs; i++) {
-        const t = i / segs;
-        const x = mix(S.xMin, S.xMax, t);
-        capBottomPts.push(new THREE.Vector2(x, reservoirTopAt(x, z)));
+    /* 盖层（顶面动态取 min(terrainHeight, capRockTop)，避免在海洋处突出） */
+    {
+        const cSegs = 160;
+        const cTopPts = [], cBotPts = [];
+        for (let i = 0; i <= cSegs; i++) {
+            const t = i / cSegs;
+            const x = mix(S.xMin, S.xMax, t);
+            cTopPts.push(new THREE.Vector2(x, Math.min(terrainHeightAt(x, z), S.capRockTop)));
+            cBotPts.push(new THREE.Vector2(x, reservoirTopAt(x, z)));
+        }
+        const cShape = new THREE.Shape();
+        cShape.moveTo(cTopPts[0].x, cTopPts[0].y);
+        for (let i = 1; i <= cSegs; i++) cShape.lineTo(cTopPts[i].x, cTopPts[i].y);
+        for (let i = cSegs; i >= 0; i--) cShape.lineTo(cBotPts[i].x, cBotPts[i].y);
+        cShape.closePath();
+        const cGeo = new THREE.ShapeGeometry(cShape, 120);
+        cGeo.computeVertexNormals();
+        assignVertexColors(cGeo, (x, y) => capRockColor(x, y, z));
+        const cMesh = new THREE.Mesh(cGeo, new THREE.MeshStandardMaterial({
+            vertexColors: true, roughness: 0.88, metalness: 0.02, side: THREE.DoubleSide,
+        }));
+        cMesh.position.z = z - 0.05;
+        group.add(cMesh);
     }
-    const cShape = new THREE.Shape();
-    cShape.moveTo(S.xMin, S.capRockTop);
-    cShape.lineTo(S.xMax, S.capRockTop);
-    for (let i = segs; i >= 0; i--) cShape.lineTo(capBottomPts[i].x, capBottomPts[i].y);
-    cShape.closePath();
-    const cGeo = new THREE.ShapeGeometry(cShape, 80);
-    cGeo.computeVertexNormals();
-    assignVertexColors(cGeo, (x, y) => capRockColor(x, y, z));
-    const cMesh = new THREE.Mesh(cGeo, new THREE.MeshStandardMaterial({
-        vertexColors: true, roughness: 0.88, metalness: 0.02, side: THREE.DoubleSide,
-    }));
-    cMesh.position.z = z - 0.05;
-    group.add(cMesh);
 
-    /* 浅层砂岩 */
-    const sShape = new THREE.Shape();
-    sShape.moveTo(S.xMin, S.lithBottom);
-    sShape.lineTo(S.xMax, S.lithBottom);
-    sShape.lineTo(S.xMax, S.surfaceRockTop);
-    sShape.lineTo(S.xMin, S.surfaceRockTop);
-    sShape.closePath();
-    const sGeo = new THREE.ShapeGeometry(sShape, 40);
-    sGeo.computeVertexNormals();
-    assignVertexColors(sGeo, (x, y) => surfaceRockColor(x, y, z));
-    const sMesh = new THREE.Mesh(sGeo, new THREE.MeshStandardMaterial({
-        vertexColors: true, roughness: 0.90, metalness: 0.01, side: THREE.DoubleSide,
-    }));
-    sMesh.position.z = z - 0.06;
-    group.add(sMesh);
+    /* 背剖面：浅层砂岩 + 地壳（BufferGeometry 条带，共享 crustBottomAt 逐点采样） */
+    {
+        const segsB = 300;
+        const xsB       = new Float32Array(segsB + 1);
+        const botFlatB  = new Float32Array(segsB + 1);
+        const midBoundB = new Float32Array(segsB + 1);
+        const topTerrB  = new Float32Array(segsB + 1);
+        for (let i = 0; i <= segsB; i++) {
+            const x = mix(S.xMin, S.xMax, i / segsB);
+            xsB[i]       = x;
+            botFlatB[i]  = S.lithBottom;
+            const cBotB  = crustBottomAt(x, z);
+            const cTopB  = terrainHeightAt(x, z);
+            midBoundB[i] = cBotB;
+            topTerrB[i]  = cTopB;
+        }
 
-    /* 地壳（地表以上部分） */
-    const profilePts = [];
-    for (let i = 0; i <= segs; i++) {
-        const t = i / segs;
-        const x = mix(S.xMin, S.xMax, t);
-        profilePts.push(new THREE.Vector2(x, terrainHeightAt(x, z)));
+        function buildStripGeoB(xArr, botArr, topArr, colorFn) {
+            const n = xArr.length;
+            const posArr = [], colArr = [], idxArr = [];
+            const colVtx = new Int32Array(n).fill(-1);
+            let vtx = 0;
+            for (let i = 0; i < n; i++) {
+                const x  = xArr[i];
+                const yB = botArr[i];
+                const yT = topArr[i];
+                if (yT - yB < 0.001) continue;
+                colVtx[i] = vtx;
+                posArr.push(x, yB, 0,  x, yT, 0);
+                const cB = colorFn(x, yB);
+                colArr.push(cB.r, cB.g, cB.b);
+                const cT = colorFn(x, yT);
+                colArr.push(cT.r, cT.g, cT.b);
+                vtx += 2;
+            }
+            for (let i = 0; i < n - 1; i++) {
+                const a = colVtx[i], b = colVtx[i + 1];
+                if (a < 0 || b < 0) continue;
+                idxArr.push(a, a+1, b,  a+1, b+1, b);
+            }
+            const geo = new THREE.BufferGeometry();
+            geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+            geo.setAttribute('color',    new THREE.Float32BufferAttribute(colArr, 3));
+            geo.setIndex(idxArr);
+            geo.computeVertexNormals();
+            return geo;
+        }
+
+        // 浅层砂岩
+        const srGeo2 = buildStripGeoB(xsB, botFlatB, midBoundB, (x, y) => surfaceRockColor(x, y, z));
+        const srMesh2 = new THREE.Mesh(srGeo2, new THREE.MeshStandardMaterial({
+            vertexColors: true, roughness: 0.90, metalness: 0.01, side: THREE.DoubleSide,
+        }));
+        srMesh2.position.z = z - 0.06;
+        group.add(srMesh2);
+
+        // 地壳
+        const crColorB = new THREE.Color(0.28, 0.28, 0.30);
+        const crGeo2 = buildStripGeoB(xsB, midBoundB, topTerrB, () => crColorB);
+        const crMesh2 = new THREE.Mesh(crGeo2, new THREE.MeshStandardMaterial({
+            vertexColors: true, roughness: 0.88, metalness: 0.01, side: THREE.DoubleSide,
+        }));
+        crMesh2.position.z = z - 0.07;
+        crMesh2.renderOrder = 2;
+        group.add(crMesh2);
     }
-    const crShape = new THREE.Shape();
-    crShape.moveTo(S.xMin, S.surfaceRockTop);
-    for (const p of profilePts) crShape.lineTo(p.x, p.y);
-    crShape.lineTo(S.xMax, S.surfaceRockTop);
-    crShape.closePath();
-    const crGeo = new THREE.ShapeGeometry(crShape, 160);
-    crGeo.computeVertexNormals();
-    assignVertexColors(crGeo, (x, y) => continentCrustColorAt(x, y));
-    const crMesh = new THREE.Mesh(crGeo, new THREE.MeshStandardMaterial({
-        vertexColors: true, roughness: 0.88, metalness: 0.02, side: THREE.DoubleSide,
-    }));
-    crMesh.position.z = z - 0.07;
-    group.add(crMesh);
 
     return group;
 }
@@ -1423,10 +1614,14 @@ function createLayeredSideWall(xPosition, textures) {
     // 侧面剖面沿 Z 轴方向采样地形高度
     const segs = 160;     // Z 轴分段数
     const ySegs = 12;     // Y 轴分段数（用于分层赋色）
+    // 侧壁 Z 范围稍微缩短，避免与正面板(z=+56)和背面板(z=-56)共面导致 Z-fighting
+    const wallBackZ  = S.backZ  + 0.15;
+    const wallFrontZ = S.frontZ - 0.15;
+    const wallDepth  = wallFrontZ - wallBackZ;
 
-    /* ——— 辅助函数：建造矩形分层面板（从 yBot 到 yTop，Z 从 backZ 到 frontZ） ——— */
+    /* ——— 辅助函数：建造矩形分层面板（从 yBot 到 yTop，Z 从 wallBackZ 到 wallFrontZ） ——— */
     function addLayer(yBot, yTop, colorFn, matOpts = {}) {
-        const geo = new THREE.PlaneGeometry(S.depth, yTop - yBot, segs, ySegs);
+        const geo = new THREE.PlaneGeometry(wallDepth, yTop - yBot, segs, ySegs);
         const pos = geo.getAttribute('position');
         // PlaneGeometry 未旋转时：pos.getX(i) ∈ [-depth/2, +depth/2] → 旋转后对应场景 Z
         //                          pos.getY(i) ∈ [-h/2, +h/2]         → 旋转后对应场景 Y（相对中心）
@@ -1454,71 +1649,176 @@ function createLayeredSideWall(xPosition, textures) {
         group.add(mesh);
     }
 
+    /* ——— 辅助函数：逐列沿 Z 轴采样动态上下界，构建精确轮廓的 BufferGeometry ——— */
+    // botFn(z)/topFn(z) 返回该 Z 处的底/顶 Y 坐标
+    // ySubdiv：在底顶之间插入的 Y 细分层数（越多颜色边界越精确）
+    // layerOrder：层序号（0=最底层），用于 polygonOffset 消除相邻层 Z-fighting
+    function addDynamicLayer(botFn, topFn, colorFn, ySubdiv = 8, matOpts = {}, layerOrder = 0) {
+        const posArr = [], colArr = [], idxArr = [];
+        const rows = ySubdiv + 1; // 每列的顶点行数（含首尾）
+
+        for (let i = 0; i <= segs; i++) {
+            const t  = i / segs;
+            const zv = mix(wallBackZ, wallFrontZ, t);
+            const yBot = botFn(zv);
+            const yTop = topFn(zv);
+            for (let j = 0; j < rows; j++) {
+                const tj = j / (rows - 1);
+                const yv = yBot + (yTop - yBot) * tj;
+                posArr.push(xPosition, yv, zv);
+                const c = colorFn(xPosition, yv, zv);
+                colArr.push(c.r, c.g, c.b);
+            }
+        }
+        // 构建索引
+        for (let i = 0; i < segs; i++) {
+            for (let j = 0; j < rows - 1; j++) {
+                const a = i * rows + j;
+                const b = i * rows + j + 1;
+                const c = (i + 1) * rows + j;
+                const d = (i + 1) * rows + j + 1;
+                idxArr.push(a, b, c, b, d, c);
+            }
+        }
+        const geo = new THREE.BufferGeometry();
+        geo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
+        geo.setAttribute('color',    new THREE.Float32BufferAttribute(colArr, 3));
+        geo.setIndex(idxArr);
+        geo.computeVertexNormals();
+        const mat = new THREE.MeshStandardMaterial({
+            vertexColors: true, roughness: 0.90, metalness: 0.02,
+            side: THREE.DoubleSide,
+            // polygonOffset 让每层在深度缓冲中微小错开，消除共面 Z-fighting
+            polygonOffset: true,
+            polygonOffsetFactor: -layerOrder,
+            polygonOffsetUnits: -layerOrder,
+            ...matOpts,
+        });
+        const mesh = new THREE.Mesh(geo, mat);
+        mesh.renderOrder = layerOrder;
+        group.add(mesh);
+    }
+
     /* ——— 各地层（从底到顶） ——— */
-    // 1. 基底岩石
+    // 1. 基底岩石（固定平坦，用静态 addLayer 即可；加 polygonOffset 避免与正/背面板共面冲突）
     addLayer(S.basementBottom, S.basementTop,
         (x, y, z) => basementRockColor(x, y, z),
-        { roughness: 0.92, metalness: 0.04 });
+        { roughness: 0.92, metalness: 0.04, polygonOffset: true, polygonOffsetFactor: 1, polygonOffsetUnits: 1 });
 
-    // 2. 不透水层（随拱形起伏——侧面取 x=xPosition 处的平均）
-    addLayer(S.waterproofBottom, S.waterproofTop,
-        (x, y, z) => waterproofLayerColor(x, y, z));
+    // 2. 不透水层（动态底面：固定底，动态顶=储集层底面）
+    addDynamicLayer(
+        () => S.waterproofBottom,
+        (zv) => reservoirBottomAt(xPosition, zv),
+        (x, y, z) => waterproofLayerColor(x, y, z),
+        6, {}, 1
+    );
 
-    // 3. 储集层（水/油/气，用渐变色按 Y 高度区分）
-    addLayer(S.reservoirBottom, S.reservoirTop,
-        (x, y, z) => {
-            const resBottom = reservoirBottomAt(x, z);
-            const resTop    = reservoirTopAt(x, z);
-            const woBound   = waterOilBoundAt(x, z);
-            const ogBound   = oilGasBoundAt(x, z);
-            if (y <= woBound)  return waterZoneColor(x, y, z);
-            if (y <= ogBound)  return oilZoneColor(x, y, z);
-            return gasZoneColor(x, y, z);
-        },
-        { emissive: new THREE.Color(0x060402), emissiveIntensity: 0.10 });
+    // 3-a. 储集层含水段（动态：底=reservoirBottom，顶=油水界面）
+    addDynamicLayer(
+        (zv) => reservoirBottomAt(xPosition, zv),
+        (zv) => waterOilBoundAt(xPosition, zv),
+        (x, y, z) => waterZoneColor(x, y, z),
+        4,
+        { emissive: new THREE.Color(0x020408), emissiveIntensity: 0.08 },
+        2
+    );
 
-    // 4. 盖层
-    addLayer(S.capRockBottom, S.capRockTop,
-        (x, y, z) => capRockColor(x, y, z));
+    // 3-b. 储集层石油段（动态：底=油水界面，顶=油气界面）
+    addDynamicLayer(
+        (zv) => waterOilBoundAt(xPosition, zv),
+        (zv) => oilGasBoundAt(xPosition, zv),
+        (x, y, z) => oilZoneColor(x, y, z),
+        4,
+        { emissive: new THREE.Color(0x060402), emissiveIntensity: 0.10 },
+        3
+    );
 
-    // 5. 浅层砂岩
-    addLayer(S.lithBottom, S.surfaceRockTop,
-        (x, y, z) => surfaceRockColor(x, y, z));
+    // 3-c. 储集层天然气段（动态：底=油气界面，顶=储集层顶面）
+    addDynamicLayer(
+        (zv) => oilGasBoundAt(xPosition, zv),
+        (zv) => reservoirTopAt(xPosition, zv),
+        (x, y, z) => gasZoneColor(x, y, z),
+        4,
+        { emissive: new THREE.Color(0x060402), emissiveIntensity: 0.10 },
+        4
+    );
+
+    // 4. 盖层（动态：底=储集层顶面，顶=固定 capRockTop）
+    addDynamicLayer(
+        (zv) => reservoirTopAt(xPosition, zv),
+        () => S.capRockTop,
+        (x, y, z) => capRockColor(x, y, z),
+        6, {}, 5
+    );
+
+    // 5. 浅层砂岩：下界 S.lithBottom，上界 = crustBottomAt（与正/背剖面对齐）
+    addDynamicLayer(
+        () => S.lithBottom,
+        (zv) => crustBottomAt(xPosition, zv),
+        (x, y, z) => surfaceRockColor(x, y, z),
+        4, { polygonOffset: true, polygonOffsetFactor: -6, polygonOffsetUnits: -6 }, 6
+    );
+
+    // 5b. 地壳下段：crustBottomAt → S.surfaceRockTop(Y=0)，深灰色，与正/背剖面对齐
+    addDynamicLayer(
+        (zv) => crustBottomAt(xPosition, zv),
+        (zv) => Math.min(terrainHeightAt(xPosition, zv), S.surfaceRockTop),
+        () => new THREE.Color(0.28, 0.28, 0.30),
+        4, { polygonOffset: true, polygonOffsetFactor: -7, polygonOffsetUnits: -7 }, 7
+    );
 
     /* ——— 地形以上部分（海洋侧壁带水体，陆地侧壁带岩石纹理） ——— */
+    // 只在陆地区域（topY > botY）绘制地形面，海洋区域 topY = 海底高度 < 0 = botY，跳过
     // 用逐列构建的 BufferGeometry 精确跟随地形高度
-    const posArr = [], idxArr = [], uvArr = [], colArr = [];
-    for (let i = 0; i <= segs; i++) {
-        const t  = i / segs;
-        const zv = mix(S.backZ, S.frontZ, t);
-        const topY  = terrainHeightAt(xPosition, zv);
-        const botY  = S.surfaceRockTop; // Y=0，地表底
-        posArr.push(xPosition, topY, zv);
-        posArr.push(xPosition, botY, zv);
-        uvArr.push(t, 1.0);
-        uvArr.push(t, 0.0);
-        const cTop = continentCrustColorAt(xPosition, topY);
-        const cBot = continentCrustColorAt(xPosition, botY);
-        colArr.push(cTop.r, cTop.g, cTop.b);
-        colArr.push(cBot.r, cBot.g, cBot.b);
+    {
+        const cPosArr = [], cIdxArr = [], cUvArr = [], cColArr = [];
+        // 记录每列的顶点起始 index（-1 表示该列跳过）
+        const colStart = [];
+        let vtxCount = 0;
+        for (let i = 0; i <= segs; i++) {
+            const t  = i / segs;
+            const zv = mix(wallBackZ, wallFrontZ, t);
+            const topY = terrainHeightAt(xPosition, zv);
+            const botY = S.surfaceRockTop; // Y=0
+            if (topY <= botY) {
+                // 海洋区域：地形低于地表底，跳过此列
+                colStart.push(-1);
+                continue;
+            }
+            colStart.push(vtxCount);
+            cPosArr.push(xPosition, topY, zv);
+            cPosArr.push(xPosition, botY, zv);
+            cUvArr.push(t, 1.0);
+            cUvArr.push(t, 0.0);
+            const crustGrayColor = new THREE.Color(0.28, 0.28, 0.30);
+            const cTop = crustGrayColor;
+            const cBot = crustGrayColor;
+            cColArr.push(cTop.r, cTop.g, cTop.b);
+            cColArr.push(cBot.r, cBot.g, cBot.b);
+            vtxCount += 2;
+        }
+        // 只在相邻两列都有效时生成三角形
+        for (let i = 0; i < segs; i++) {
+            const sa = colStart[i], sb = colStart[i + 1];
+            if (sa < 0 || sb < 0) continue;
+            const a = sa, b = sa + 1, c = sb, d = sb + 1;
+            cIdxArr.push(a, b, c, b, d, c);
+        }
+        if (cPosArr.length >= 9) {
+            const crustGeo = new THREE.BufferGeometry();
+            crustGeo.setAttribute('position', new THREE.Float32BufferAttribute(cPosArr, 3));
+            crustGeo.setAttribute('uv',       new THREE.Float32BufferAttribute(cUvArr, 2));
+            crustGeo.setAttribute('color',    new THREE.Float32BufferAttribute(cColArr, 3));
+            crustGeo.setIndex(cIdxArr);
+            crustGeo.computeVertexNormals();
+            const crustMat = new THREE.MeshStandardMaterial({
+                vertexColors: true, roughness: 0.88, metalness: 0.01,
+                side: THREE.DoubleSide,
+                polygonOffset: true, polygonOffsetFactor: -8, polygonOffsetUnits: -8,
+            });
+            group.add(new THREE.Mesh(crustGeo, crustMat));
+        }
     }
-    for (let i = 0; i < segs; i++) {
-        const a = i * 2, b = i * 2 + 1, c = (i + 1) * 2, d = (i + 1) * 2 + 1;
-        idxArr.push(a, b, c, b, d, c);
-    }
-    const crustGeo = new THREE.BufferGeometry();
-    crustGeo.setAttribute('position', new THREE.Float32BufferAttribute(posArr, 3));
-    crustGeo.setAttribute('uv',       new THREE.Float32BufferAttribute(uvArr, 2));
-    crustGeo.setAttribute('color',    new THREE.Float32BufferAttribute(colArr, 3));
-    crustGeo.setIndex(idxArr);
-    crustGeo.computeVertexNormals();
-    const crustMat = new THREE.MeshStandardMaterial({
-        vertexColors: true, roughness: 0.94, metalness: 0.01,
-        map: textures.rockColor, bumpMap: textures.rockBump,
-        roughnessMap: textures.rockRoughness, bumpScale: 0.35,
-        side: THREE.DoubleSide,
-    });
-    group.add(new THREE.Mesh(crustGeo, crustMat));
 
     /* ——— 海水（仅左侧海洋端出现） ——— */
     const isOceanSide = xPosition <= S.xMin + 1;
@@ -1527,13 +1827,13 @@ function createLayeredSideWall(xPosition, textures) {
         const wPosArr = [], wIdxArr = [], wColArr = [];
         for (let i = 0; i <= segs; i++) {
             const t  = i / segs;
-            const zv = mix(S.backZ, S.frontZ, t);
+            const zv = mix(wallBackZ, wallFrontZ, t);
             const ws = indiaWestCoast(zv);
             if (xPosition > ws) continue; // 不在海洋区域则跳过
-            const floorY = Math.min(oceanFloorHeight(xPosition, zv), S.seaLevel - 0.1);
-            wPosArr.push(xPosition, S.seaLevel, zv);
+            const floorY = Math.max(Math.min(oceanFloorHeight(xPosition, zv), S.seaLevel - 0.1), S.basementBottom); // clamp 防止超出底面
+            const topY = S.seaLevel + seaWaveAt(xPosition, zv); // 上边界跟随波浪起伏
+            wPosArr.push(xPosition, topY, zv);
             wPosArr.push(xPosition, floorY, zv);
-            const w = i;
             wColArr.push(0.04, 0.22, 0.62);
             wColArr.push(0.02, 0.12, 0.42);
         }
@@ -1927,10 +2227,12 @@ export function createTectonicLandscape(scene, deps = {}) {
     root.add(oceanFloorTop);
 
     /* ===== 5. 海水层（背面面板） ===== */
-    const waterBedProfileBack = sampleProfile(S.backZ, S.xMin, westShore0 + 0.8, 180, (x, z) => (
-        Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1)
+    // xEnd 使用背面真实海岸线，避免海水超出陆地区域
+    const westShoreBack = indiaWestCoast(S.backZ);
+    const waterBedProfileBack = sampleProfile(S.backZ, S.xMin, westShoreBack, 180, (x, z) => (
+        Math.max(Math.min(oceanFloorHeight(x, z), S.seaLevel - 0.1), S.basementBottom)
     ));
-    const waterTopProfileBack = waterBedProfileBack.map(p => new THREE.Vector2(p.x, S.seaLevel));
+    const waterTopProfileBack = waterBedProfileBack.map(p => new THREE.Vector2(p.x, S.seaLevel + seaWaveAt(p.x, S.backZ)));
     const waterBack = createFilledSection(waterTopProfileBack, waterBedProfileBack, waterColorAt, {
         opacity: 0.78, emissive: new THREE.Color(0x1270b0), emissiveIntensity: 0.65,
     });
@@ -1960,12 +2262,17 @@ export function createTectonicLandscape(scene, deps = {}) {
         const bayEndBack    = eastShoreBack + 5.0;
         const segs = 40;
         const bayBackShape = new THREE.Shape();
-        bayBackShape.moveTo(eastShoreBack, S.seaLevel);
-        bayBackShape.lineTo(bayEndBack, S.seaLevel);
+        // 上边界跟随波浪起伏
+        bayBackShape.moveTo(eastShoreBack, S.seaLevel + seaWaveAt(eastShoreBack, zBack));
+        for (let i = 1; i <= segs; i++) {
+            const x = mix(eastShoreBack, bayEndBack, i / segs);
+            bayBackShape.lineTo(x, S.seaLevel + seaWaveAt(x, zBack));
+        }
+        // 下边界从右到左（clamp 防止超出模型底面）
         for (let i = segs; i >= 0; i--) {
             const t = i / segs;
             const x = mix(eastShoreBack, bayEndBack, t);
-            const y = Math.min(bayBedHeight(x, zBack), S.seaLevel - 0.1);
+            const y = Math.max(Math.min(bayBedHeight(x, zBack), S.seaLevel - 0.1), S.basementBottom);
             bayBackShape.lineTo(x, y);
         }
         bayBackShape.closePath();
@@ -2136,29 +2443,28 @@ export function createTectonicLandscape(scene, deps = {}) {
     // ridgeGlowStrip 已删除
 
     /* ===== 12. 陆地油井 ===== */
-    // 陆地油井：位于右侧亚欧大陆，放在剪面图正面边缘（frontZ）
-    // 这样从剪面角度就能看到笔直的油管
+    // 右拱顶中心在 x≈55（亚欧大陆内陆），陆地油井放在拱顶正上方
+    // 油井放在剖面正面边缘（frontZ），从剖面角度可见笔直油管穿入油层
     {
-        const lwX = 40;
-        const lwZ = S.frontZ; // 放在剪面图正面边缘
+        const lwX = 55;
+        const lwZ = S.frontZ;
         const lwSurfaceY = continentHeight(lwX, lwZ);
-        // 油层位于 oilGasBound 处
-        const lwOilLayerY = oilGasBoundAt(lwX, lwZ) - 2;
+        // 油管深入到油层中间位置（油水界面 ~ 油气界面之间）
+        const lwOilLayerY = (waterOilBoundAt(lwX, lwZ) + oilGasBoundAt(lwX, lwZ)) * 0.5;
         const landWell = createLandOilWell(lwX, lwZ, lwSurfaceY, lwOilLayerY);
         root.add(landWell);
     }
 
     /* ===== 13. 海上钻井平台 ===== */
-    // 海洋油井：在大洋中部（海洋区域），位于右侧海洋拱顶区域上方
-    // 左拱中心约 x = -20（陆地一侧），右拱中心约 x = -80（海洋方向）
-    // 在海洋中选择一个位置
+    // 左拱顶中心在 x≈-65（大洋中部，完全在海洋区域内）
+    // 海上平台位于左拱顶正上方的海面
     {
-        const owX = -55;  // 海洋区域（-130 到 indiaWestCoast(-55) 大概在-30左右），-55 在海洋内
-        const owZ = 10;   // 稍偏前
+        const owX = -65;   // 左拱顶 x 坐标，深海区域
+        const owZ = 5;     // 略偏前（剖面可见）
         const owSeaLevel = S.seaLevel;
         const owSeabedY = oceanFloorHeight(owX, owZ);
-        // 油层深度：在油气边界处
-        const owOilLayerY = oilGasBoundAt(owX, owZ) - 2;
+        // 油管深入到油层中间位置
+        const owOilLayerY = (waterOilBoundAt(owX, owZ) + oilGasBoundAt(owX, owZ)) * 0.5;
         const offshorePlatform = createOffshoreOilPlatform(owX, owZ, owSeaLevel, owSeabedY, owOilLayerY);
         root.add(offshorePlatform);
     }
@@ -2168,11 +2474,11 @@ export function createTectonicLandscape(scene, deps = {}) {
         ridge:         new THREE.Vector3(S.ridgeX + 6, S.seaLevel + 18, -8),
         india:         new THREE.Vector3(-15, S.seaLevel + 12, -18),
         eurasia:       new THREE.Vector3(80, S.eurAsiaPeakMax + 12, 18),
-        // 石油地下锚点（用于标签）
-        gasZone:       new THREE.Vector3(-15, S.oilGasBound + 3, S.frontZ),
-        oilZone:       new THREE.Vector3(-15, (S.waterOilBound + S.oilGasBound) * 0.5, S.frontZ),
-        waterZone:     new THREE.Vector3(-15, S.reservoirBottom + 2, S.frontZ),
-        waterproof:    new THREE.Vector3(40, S.waterproofBottom + 3, S.frontZ),
+        // 石油地下锚点（用于标签）— 使用右拱顶(x=55)的实际动态高度
+        gasZone:       new THREE.Vector3(55, oilGasBoundAt(55, S.frontZ) + 1.5, S.frontZ),
+        oilZone:       new THREE.Vector3(55, (waterOilBoundAt(55, S.frontZ) + oilGasBoundAt(55, S.frontZ)) * 0.5, S.frontZ),
+        waterZone:     new THREE.Vector3(55, reservoirBottomAt(55, S.frontZ) + 2, S.frontZ),
+        waterproof:    new THREE.Vector3(40, waterproofTopAt(40, S.frontZ) - 3, S.frontZ),
         capRock:       new THREE.Vector3(-50, S.capRockBottom + 3, S.frontZ),
     };
 
